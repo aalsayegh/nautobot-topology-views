@@ -1,0 +1,82 @@
+[tool.poetry]
+name = "nautobot-topology-views"
+version = "1.0.0"
+description = "A Nautobot App to create Topology maps"
+readme = "README.md"
+authors = ["Mattijs Vanhaverbeke <author@example.com>"]
+license = "Apache-2.0"
+homepage = "https://github.com/mattieserver/netbox-topology-views"
+repository = "https://github.com/mattieserver/netbox-topology-views"
+keywords = ["nautobot", "nautobot-app", "topology"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: Django",
+    "Framework :: Django :: 5.2",
+]
+packages = [
+    { include = "nautobot_topology_views" },
+]
+include = [
+    "nautobot_topology_views/static/**/*",
+    "nautobot_topology_views/templates/**/*",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.15"
+nautobot = "^3.1.2"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.4.0"
+black = "^24.0.0"
+pytest = "^8.0.0"
+pytest-django = "^4.8.0"
+invoke = "^2.2.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py312']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.eggs
+    | \.git
+    | \.tox
+    | \.venv
+    | _build
+    | build
+    | dist
+    | migrations
+  )/
+)
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "nautobot.core.tests.nautobot_config"
+python_files = ["test_*.py", "*_test.py"]

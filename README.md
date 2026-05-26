@@ -1,53 +1,73 @@
-# Netbox Topology Views Plugin
+# Nautobot Topology Views App
 
-![Version](https://img.shields.io/pypi/v/netbox-topology-views) ![Downloads](https://img.shields.io/pypi/dm/netbox-topology-views)
-
-Create topology views/maps from your devices in NetBox.
-The connections are based on the cables you created in NetBox.
-Support to filter on name, site, tag and device role.  
+Create topology views/maps from your devices in Nautobot.
+The connections are based on the cables you created in Nautobot.
+Support to filter on name, location, tag and device role.  
 Options to export to xml (for draw.io/diagrams.net) or png.
+
+> **Note**: This app was originally developed for NetBox and has been converted to Nautobot 3.1.2.
 
 ## Preview
 
 ![Topology with light mode](doc/img/topology_light.png)
 ![Topology with dark mode](doc/img/topology_dark.png)
 
+## Requirements
+
+- Nautobot 3.1.2 or later
+- Python 3.12 or later
+- Django 5.2
+
 ## Install
 
-**_NOTE:_** For Docker please see: [Docker install](https://github.com/netbox-community/netbox-docker/wiki/Using-Netbox-Plugins)
+The app is available as a Python package and can be installed with Poetry or pip.
 
-**_NOTE:_** Add `RUN mkdir -p /opt/netbox/netbox/static/netbox_topology_views/img` to the Dockerfile-Plugins file to create the image folder.
+### Using Poetry (Recommended)
 
-The plugin is available as a Python package and can be installed with pip.
-
-First run `source /opt/netbox/venv/bin/activate` to enter the Python virtual environment.
+Add to your Nautobot's pyproject.toml:
+```toml
+[tool.poetry.dependencies]
+nautobot-topology-views = "^1.0.0"
+```
 
 Then run:
 ```bash
-cd /opt/netbox/netbox
-pip3 install netbox-topology-views
-python3 manage.py migrate netbox_topology_views
-python3 manage.py collectstatic --no-input
+poetry install
+nautobot-server migrate nautobot_topology_views
+nautobot-server collectstatic --no-input
 ```
 
-To ensure NetBox Topology Views plugin is automatically re-installed during future upgrades, create a file named `local_requirements.txt` (if not already existing) in the NetBox root directory (alongside `requirements.txt`) and list the `netbox-topology-views` package:
+### Using pip
 
-```no-highlight
-echo netbox-topology-views >> /opt/netbox/local_requirements.txt
+```bash
+pip install nautobot-topology-views
+nautobot-server migrate nautobot_topology_views
+nautobot-server collectstatic --no-input
 ```
 
-Once installed, the plugin needs to be enabled in your `configuration.py`:
-```no-highlight
-vim /opt/netbox/netbox/netbox/configuration.py
-```
+## Configuration
+
+Enable the app in your `nautobot_config.py`:
 
 ```python
-PLUGINS = ["netbox_topology_views"]
+PLUGINS = ["nautobot_topology_views"]
 ```
 
-Finally, restart NetBox:
-```no-highlight
-systemctl restart netbox
+### Plugin Settings
+
+```python
+PLUGINS_CONFIG = {
+    "nautobot_topology_views": {
+        "static_image_directory": "nautobot_topology_views/img",
+        "allow_coordinates_saving": False,
+        "always_save_coordinates": False,
+    }
+}
+```
+
+Finally, restart Nautobot:
+```bash
+systemctl restart nautobot
 ```
 
 ### Versions
