@@ -774,7 +774,7 @@ class TopologyHomeView(PermissionRequiredMixin, View):
             filter_required = True
             empty_result = False
 
-            if "group" not in request.GET:
+            if not request.GET.get("group"):
                 group_id = "default"
             else:
                 group_id = request.GET["group"]

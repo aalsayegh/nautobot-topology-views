@@ -1,0 +1,20 @@
+{% if active_filters %}
+<div class="d-flex flex-wrap align-items-center gap-2 py-2 px-1">
+  <span class="text-muted small me-1">Active filters:</span>
+  {% for f in active_filters %}
+  <span class="badge bg-secondary d-inline-flex align-items-center gap-1 fs-6 fw-normal">
+    <span class="text-white-50">{{ f.label }}:</span>
+    <span>{{ f.value }}</span>
+    <a href="{{ f.remove_url }}"
+       class="text-white ms-1 text-decoration-none"
+       title="Remove this filter"
+       aria-label="Remove filter: {{ f.label }} {{ f.value }}">
+      <i class="mdi mdi-close-circle" style="font-size: 1em; vertical-align: middle;"></i>
+    </a>
+  </span>
+  {% endfor %}
+  <a href="." class="btn btn-sm btn-outline-secondary ms-2">
+    <i class="mdi mdi-backspace me-1" aria-hidden="true"></i>Clear all
+  </a>
+</div>
+{% endif %}
