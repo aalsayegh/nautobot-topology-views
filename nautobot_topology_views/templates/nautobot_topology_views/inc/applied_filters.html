@@ -3,7 +3,7 @@
   <span class="text-muted small me-1">Active filters:</span>
   {% for f in active_filters %}
   <span class="badge bg-secondary d-inline-flex align-items-center gap-1 fs-6 fw-normal">
-    <span class="text-white-50">{{ f.label }}:</span>
+    <span class="text-white">{{ f.label }}:</span>
     <span>{{ f.value }}</span>
     <a href="{{ f.remove_url }}"
        class="text-white ms-1 text-decoration-none"
@@ -14,7 +14,7 @@
   </span>
   {% endfor %}
   <a href="." class="btn btn-sm btn-outline-secondary ms-2">
-    <i class="mdi mdi-backspace me-1" aria-hidden="true"></i>Clear all
+    <i class="mdi mdi-backspace me-1" aria-hidden="true"></i> Restore defaults
   </a>
 </div>
 {% endif %}
