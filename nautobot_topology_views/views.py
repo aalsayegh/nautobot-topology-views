@@ -870,6 +870,84 @@ CONFIG = settings.PLUGINS_CONFIG["nautobot_topology_views"]
 ADDITIONAL_ROLES = (PowerPanel, PowerFeed, Circuit)
 
 
+class LocationTopologyView(PermissionRequiredMixin, View):
+    """Render the topology view filtered to a specific location, for use as a tab on the Location detail page."""
+
+    permission_required = ("dcim.view_location", "dcim.view_device")
+
+    def get(self, request, pk):
+        from nautobot.dcim.models import Location
+
+        location = get_object_or_404(Location.objects.restrict(request.user, "view"), pk=pk)
+
+        individualOptions, _ = IndividualOptions.objects.get_or_create(user=request.user)
+
+        # Build filter query dict with location pre-applied
+        q = QueryDict(mutable=True)
+        q.setlist("location_id", [str(pk)])
+
+        queryset = Device.objects.restrict(request.user, "view").select_related("device_type", "role")
+        queryset = DeviceFilterSet(q, queryset).qs
+
+        # Resolve display options from IndividualOptions
+        save_coords = individualOptions.save_coords
+        if save_coords and not settings.PLUGINS_CONFIG["nautobot_topology_views"]["allow_coordinates_saving"]:
+            save_coords = False
+            messages.warning(request, "Coordinate saving not allowed. Setting has been overridden")
+        elif settings.PLUGINS_CONFIG["nautobot_topology_views"]["always_save_coordinates"]:
+            save_coords = True
+
+        ignore_cable_type = individualOptions.ignore_cable_type.translate({ord(i): None for i in "[]'"}).split(", ")
+        if ignore_cable_type == [""]:
+            ignore_cable_type = []
+
+        node_label_items = individualOptions.node_label_items.translate({ord(i): None for i in "[]'"}).split(", ")
+        if node_label_items == [""]:
+            node_label_items = []
+
+        topo_data = get_topology_data(
+            queryset=queryset,
+            individualOptions=individualOptions,
+            ignore_cable_type=ignore_cable_type,
+            save_coords=save_coords,
+            show_unconnected=individualOptions.show_unconnected,
+            show_cables=individualOptions.show_cables,
+            show_logical_connections=individualOptions.show_logical_connections,
+            show_single_cable_logical_conns=individualOptions.show_single_cable_logical_conns,
+            show_neighbors=individualOptions.show_neighbors,
+            show_circuit=individualOptions.show_circuit,
+            show_power=individualOptions.show_power,
+            show_wireless=individualOptions.show_wireless,
+            group_sites=individualOptions.group_sites,
+            group_locations=individualOptions.group_locations,
+            group_racks=individualOptions.group_racks,
+            group_virtualchassis=individualOptions.group_virtualchassis,
+            group_id="default",
+            straight_cables=individualOptions.straight_cables,
+            draw_termination_labels=individualOptions.draw_termination_labels,
+            draw_cable_labels=individualOptions.draw_cable_labels,
+            grid_size=individualOptions.grid_size,
+            node_label_items=node_label_items,
+        )
+
+        empty_result = topo_data is None or not topo_data.get("nodes")
+
+        return render(
+            request,
+            "nautobot_topology_views/index.html",
+            {
+                "filter_form": DeviceFilterForm(q, label_suffix=""),
+                "topology_data": json.dumps(topo_data, cls=UUIDEncoder),
+                "broken_image": find_image_url("role-unknown"),
+                "model": queryset.model,
+                "basepath": getattr(settings, "BASE_PATH", ""),
+                "filter_required": False,
+                "empty_result": empty_result,
+                "location": location,
+            },
+        )
+
+
 class TopologyImagesView(PermissionRequiredMixin, View):
     permission_required = (
         "dcim.view_site",

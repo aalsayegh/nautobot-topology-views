@@ -56,4 +56,7 @@ urlpatterns = (
     path("coordinate/<uuid:pk>/edit/", views.CoordinateEditView.as_view(), name="coordinate_edit"),
     path("coordinate/<uuid:pk>/delete/", views.CoordinateDeleteView.as_view(), name="coordinate_delete"),
     path("coordinate/<uuid:pk>/changelog/", ObjectChangeLogView.as_view(), name="coordinate_changelog", kwargs={'model': models.Coordinate}),
+
+    # Location topology tab
+    path("location/<uuid:pk>/topology/", views.LocationTopologyView.as_view(), name="location_topology"),
 )
