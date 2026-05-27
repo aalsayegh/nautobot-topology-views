@@ -5,7 +5,7 @@ The connections are based on the cables you created in Nautobot.
 Support to filter on name, location, tag and device role.  
 Options to export to xml (for draw.io/diagrams.net) or png.
 
-> **Note**: This app was originally developed for NetBox and has been converted to Nautobot 3.1.2.
+> **Note**: This app was originally developed for NetBox and has been converted to Nautobot 3.1.3.
 
 ## Preview
 
@@ -14,7 +14,7 @@ Options to export to xml (for draw.io/diagrams.net) or png.
 
 ## Requirements
 
-- Nautobot 3.1.2 or later
+- Nautobot 3.1.3 or later
 - Python 3.12 or later
 - Django 5.2
 

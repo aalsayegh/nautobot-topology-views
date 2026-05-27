@@ -8,8 +8,8 @@ from django.templatetags.static import static
 from django.urls import reverse
 from nautobot.apps.models import PrimaryModel
 from nautobot.circuits.models import Circuit
-from nautobot.dcim.models import Device, PowerFeed, PowerPanel, Role
-from nautobot.extras.models import ChangeLoggedModel, Tag
+from nautobot.dcim.models import Device, PowerFeed, PowerPanel
+from nautobot.extras.models import ChangeLoggedModel, Role, Tag
 
 from nautobot_topology_views.choices import NodeLabelItems
 from nautobot_topology_views.utils import (
@@ -33,12 +33,12 @@ class RoleImage(ChangeLoggedModel):
     image = models.CharField("Path within the nautobot static directory", max_length=255)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.UUIDField(null=True, blank=True)
 
     __role: Optional["RoleData"] = None
 
     @property
-    def role(self) -> "RoleData":
+    def role_data(self) -> "RoleData":
         if self.__role:
             return self.__role
 
@@ -56,7 +56,7 @@ class RoleImage(ChangeLoggedModel):
         return self.__role
 
     def __str__(self):
-        return f"{self.role} - {self.image}"
+        return f"{self.role_data} - {self.image}"
 
     def get_image(self) -> Path:
         """Get Icon
@@ -67,7 +67,7 @@ class RoleImage(ChangeLoggedModel):
         path = Path(settings.STATIC_ROOT) / self.image
 
         if not path.exists():
-            raise ValueError(f"{self.role} path '{path}' does not exists")
+            raise ValueError(f"{self.role_data} path '{path}' does not exists")
 
         return path
 
@@ -79,7 +79,7 @@ class RoleImage(ChangeLoggedModel):
 
         fallback is `STATIC_ROOT/nautobot_topology_views/img/role-unknown.png`
         """
-        if url := find_image_url(self.role.slug, dir):
+        if url := find_image_url(self.role_data.slug, dir):
             return url
 
         # fallback to default role unknown image
@@ -90,7 +90,7 @@ class RoleImage(ChangeLoggedModel):
             self.get_image()
         except ValueError:
             return self.get_default_image(dir)
-        return static(f"/{self.image}")
+        return static(str(self.image))
 
 class CoordinateGroup(PrimaryModel):
     """
@@ -324,16 +324,19 @@ class IndividualOptions(PrimaryModel):
         ('consoleserverport', 'consoleserverport'),
     )
 
-    user_id = models.IntegerField(
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         null=True,
-        unique=True
+        unique=True,
+        related_name='+',
     )
     ignore_cable_type = models.CharField(
         max_length = 255,
         blank = True,
     )
     preselected_device_roles = models.ManyToManyField(
-        to='dcim.Role',
+        to='extras.Role',
         related_name='+',
         blank=True,
         db_table='nautobot_topology_views_individualoptions_preselected_device',
@@ -404,4 +407,4 @@ class IndividualOptions(PrimaryModel):
     )
 
     def __str___(self):
-        return f"{self.user_id}"
+        return f"{self.user}"

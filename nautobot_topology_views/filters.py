@@ -1,8 +1,14 @@
 import django_filters
 from django.db.models import Q
-from nautobot.apps.filters import NautobotFilterSet
+from nautobot.apps.filters import (
+    MultiValueCharFilter,
+    MultiValueMACAddressFilter,
+    NautobotFilterSet,
+    TreeNodeMultipleChoiceFilter,
+)
 from nautobot.circuits.models import Circuit
 from nautobot.dcim.choices import DeviceStatusChoices
+from nautobot.dcim.filter_mixins import LocatableModelFilterSetMixin
 from nautobot.dcim.models import (
     Device,
     DeviceType,
@@ -12,15 +18,9 @@ from nautobot.dcim.models import (
     PowerFeed,
     PowerPanel,
     Rack,
-    Region,
-    Role,
-    Site,
-    SiteGroup,
 )
-from nautobot.extras.filters import LocalConfigContextFilterSet
-from nautobot.extras.models import ConfigTemplate
-from nautobot.tenancy.filters import ContactModelFilterSet, TenancyFilterSet
-from nautobot.utilities.filters import MultiValueCharFilter, MultiValueMACAddressFilter, TreeNodeMultipleChoiceFilter
+from nautobot.extras.models import Role
+from nautobot.tenancy.filter_mixins import TenancyModelFilterSetMixin
 
 from nautobot_topology_views.models import (
     CircuitCoordinate,
@@ -31,7 +31,7 @@ from nautobot_topology_views.models import (
 )
 
 
-class DeviceFilterSet(NautobotFilterSet, TenancyFilterSet, ContactModelFilterSet, LocalConfigContextFilterSet):
+class DeviceFilterSet(NautobotFilterSet, TenancyModelFilterSetMixin, LocatableModelFilterSetMixin):
     q = django_filters.CharFilter(
         method="search",
         label="Search",
@@ -59,22 +59,6 @@ class DeviceFilterSet(NautobotFilterSet, TenancyFilterSet, ContactModelFilterSet
     platform_id = django_filters.ModelMultipleChoiceFilter(
         queryset=Platform.objects.all(),
         label="Platform (ID)",
-    )
-    region_id = TreeNodeMultipleChoiceFilter(
-        queryset=Region.objects.all(),
-        field_name="site__region",
-        lookup_expr="in",
-        label="Region (ID)",
-    )
-    site_group_id = TreeNodeMultipleChoiceFilter(
-        queryset=SiteGroup.objects.all(),
-        field_name="site__group",
-        lookup_expr="in",
-        label="Site Group (ID)",
-    )
-    site_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=Site.objects.all(),
-        label="Site (ID)",
     )
     location_id = TreeNodeMultipleChoiceFilter(
         queryset=Location.objects.all(),
@@ -122,10 +106,6 @@ class DeviceFilterSet(NautobotFilterSet, TenancyFilterSet, ContactModelFilterSet
         method='_pass_through_ports',
         label="Has pass-through ports",
     )
-    config_template_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=ConfigTemplate.objects.all(),
-        label="Config template (ID)",
-    )
     has_primary_ip = django_filters.BooleanFilter(
         method='_has_primary_ip',
         label="Has a primary IP",
@@ -141,7 +121,7 @@ class DeviceFilterSet(NautobotFilterSet, TenancyFilterSet, ContactModelFilterSet
 
     class Meta:
         model = Device
-        fields = ["id", "name", "asset_tag", "airflow"]
+        fields = ["id", "name", "asset_tag"]
 
     def search(self, queryset, name, value):
         """Perform the filtered search."""
@@ -186,7 +166,7 @@ class DeviceFilterSet(NautobotFilterSet, TenancyFilterSet, ContactModelFilterSet
     def _virtual_chassis_member(self, queryset, name, value):
         return queryset.exclude(virtual_chassis__isnull=value)
 
-class CircuitCoordinatesFilterSet(NautobotFilterSet):
+class CircuitCoordinateFilterSet(NautobotFilterSet):
     group = django_filters.ModelMultipleChoiceFilter(
         queryset = CoordinateGroup.objects.all(),
     )
@@ -208,7 +188,7 @@ class CircuitCoordinatesFilterSet(NautobotFilterSet):
             Q(device__name__icontains=value)
         )
 
-class PowerPanelCoordinatesFilterSet(NautobotFilterSet):
+class PowerPanelCoordinateFilterSet(NautobotFilterSet):
     group = django_filters.ModelMultipleChoiceFilter(
         queryset = CoordinateGroup.objects.all(),
     )
@@ -230,7 +210,7 @@ class PowerPanelCoordinatesFilterSet(NautobotFilterSet):
             Q(device__name__icontains=value)
         )
 
-class PowerFeedCoordinatesFilterSet(NautobotFilterSet):
+class PowerFeedCoordinateFilterSet(NautobotFilterSet):
     group = django_filters.ModelMultipleChoiceFilter(
         queryset = CoordinateGroup.objects.all(),
     )
@@ -252,7 +232,7 @@ class PowerFeedCoordinatesFilterSet(NautobotFilterSet):
             Q(device__name__icontains=value)
         )
 
-class CoordinatesFilterSet(NautobotFilterSet):
+class CoordinateFilterSet(NautobotFilterSet):
     group = django_filters.ModelMultipleChoiceFilter(
         queryset = CoordinateGroup.objects.all(),
     )
@@ -273,3 +253,20 @@ class CoordinatesFilterSet(NautobotFilterSet):
             Q(group__name__icontains=value) |
             Q(device__name__icontains=value)
         )
+
+
+class CoordinateGroupFilterSet(NautobotFilterSet):
+    q = django_filters.CharFilter(
+        method="search",
+        label="Search",
+    )
+
+    class Meta:
+        model = CoordinateGroup
+        fields = ['id', 'name']
+
+    def search(self, queryset, name, value):
+        """Perform the filtered search."""
+        if not value.strip():
+            return queryset
+        return queryset.filter(Q(name__icontains=value))

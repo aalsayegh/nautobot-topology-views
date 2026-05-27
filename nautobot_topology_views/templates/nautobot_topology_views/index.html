@@ -1,4 +1,4 @@
-{% extends 'generic/_base.html' %}
+{% extends 'base.html' %}
 {% load buttons %}
 {% load render_table from django_tables2 %}
 {% load static %}
@@ -7,12 +7,12 @@
 
 {% block title %}Topology Views{% endblock %}
 
-{% block head %}
+{% block extra_styles %}
 <link rel="stylesheet" href="{% static 'nautobot_topology_views/css/vendor.css' %}">
 <link rel="stylesheet" href="{% static 'nautobot_topology_views/css/app.css' %}">
-{% endblock %} 
+{% endblock %}
 
-{% block controls %}
+{% block content %}
   <div class="controls">
     	<div class="control-group">
 			{% block extra_controls %}{% endblock %}
@@ -26,9 +26,7 @@
 			</a>
     	</div>
 	</div>
-{% endblock controls %}
 
-{% block tabs %}
 	<ul class="nav nav-tabs" id="tabswrapper">
     	{% block tab_items %}
 		<li class="nav-item" role="presentation">
@@ -40,24 +38,26 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link" id="filters-form-tab" data-bs-toggle="tab" data-bs-target="#filters-form" type="button" role="tab" aria-controls="object-list" aria-selected="false">
             Filters
-            {% if filter_form %}{% badge filter_form.changed_data|length bg_color="blue" %}{% endif %}
+            {% if filter_form %}{% badge filter_form.changed_data|length %}{% endif %}
           </button>
         </li>
       	{% endif %}
 		{% endblock tab_items %}
 	</ul>
-{% endblock tabs %}
 
-{% block content %}
   {% with config=settings.PLUGINS_CONFIG.nautobot_topology_views %}
     <div class="tab-content" id="tabcontentwrapper">
 
+
+      {% comment %}
+      <!-- applied_filters tag is NetBox-specific, not available in Nautobot -->
       {# Applied filters #}
       {% if filter_form %}
         <div id="filterwrapper">
           {% applied_filters model filter_form request.GET %}
         </div>
       {% endif %}
+      {% endcomment %}
 
       <div class="tab-pane show active" id="networks" role="tabpanel" aria-labelledby="network-tab">
         <div class="panel-body">
@@ -72,11 +72,15 @@
         </div>
       </div>
 
+      {% comment %}
+      <!-- inc/filter_list.html is NetBox-specific, not available in Nautobot. It also calls functions like render_fieldset not present in nautobot -->
       {% if filter_form %}
       <div class="tab-pane show" id="filters-form" role="tabpanel" aria-labelledby="filters-form-tab">
         {% include 'inc/filter_list.html' %}
       </div>
       {% endif %}
+      {% endcomment %}
+
 
     </div>
   {% endwith %}
@@ -87,6 +91,7 @@
     const brokenImage = '{{ broken_image }}';
     const topologyData = {{ topology_data | safe }};
     const basePath = '{{ basepath }}';
+    window.CSRF_TOKEN = '{{ csrf_token }}';
 
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();

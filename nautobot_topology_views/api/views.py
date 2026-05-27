@@ -1,12 +1,13 @@
 from typing import Dict
 import sys
+import uuid
 
 from nautobot.apps.api import NautobotModelViewSet
 from nautobot.core.api.views import ModelViewSet as NautobotBaseViewSet
 
 from nautobot.circuits.models import Circuit
-from nautobot.dcim.models import Device, Role, PowerFeed, PowerPanel
-from nautobot.extras.models import SavedFilter
+from nautobot.dcim.models import Device, PowerFeed, PowerPanel
+from nautobot.extras.models import Role
 from django.conf import settings
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
@@ -117,41 +118,8 @@ class ExportTopoToXML(ViewSet):
 
             filter_id, ignore_cable_type, save_coords, show_unconnected, show_power, show_circuit, show_logical_connections, show_single_cable_logical_conns, show_cables, show_wireless, group_sites, group_locations, group_racks, group_virtualchassis, group, show_neighbors, straight_cables, draw_termination_labels, draw_cable_labels, grid_size, node_label_items = get_query_settings(request)
 
-            # Read options from saved filters as Nautobot does not handle custom app filters
-            if "filter_id" in request.GET and request.GET["filter_id"] != '':
-                try:
-                    saved_filter = SavedFilter.objects.get(pk=filter_id)
-                    saved_filter_params = getattr(saved_filter, 'parameters')
-
-                    if ignore_cable_type == () and 'ignore_cable_type' in saved_filter_params: ignore_cable_type = saved_filter_params['ignore_cable_type']
-                    if save_coords == False and 'save_coords' in saved_filter_params: save_coords = saved_filter_params['save_coords']
-                    if show_unconnected == False and 'show_unconnected' in saved_filter_params: show_unconnected = saved_filter_params['show_unconnected']
-                    if show_power == False and 'show_power' in saved_filter_params: show_power = saved_filter_params['show_power']
-                    if show_circuit == False and 'show_circuit' in saved_filter_params: show_circuit = saved_filter_params['show_circuit']
-                    if show_logical_connections == False and 'show_logical_connections' in saved_filter_params: show_logical_connections = saved_filter_params['show_logical_connections']
-                    if show_single_cable_logical_conns == False and 'show_single_cable_logical_conns' in saved_filter_params: show_single_cable_logical_conns = saved_filter_params['show_single_cable_logical_conns']
-                    if show_cables == False and 'show_cables' in saved_filter_params: show_cables = saved_filter_params['show_cables']
-                    if show_wireless == False and 'show_wireless' in saved_filter_params: show_wireless = saved_filter_params['show_wireless']
-                    if group_sites == False and 'group_sites' in saved_filter_params: group_sites = saved_filter_params['group_sites']
-                    if group_locations == False and 'group_locations' in saved_filter_params: group_locations = saved_filter_params['group_locations']
-                    if group_racks == False and 'group_racks' in saved_filter_params: group_racks = saved_filter_params['group_racks']
-                    if group_virtualchassis == False and 'group_virtualchassis' in saved_filter_params: group_virtualchassis = saved_filter_params['group_virtualchassis']
-                    if show_neighbors == False and 'show_neighbors' in saved_filter_params: show_neighbors = saved_filter_params['show_neighbors']
-                    if straight_cables == False and 'straight_cables' in saved_filter_params: straight_cables = saved_filter_params['straight_cables']
-                    if draw_termination_labels == False and 'draw_termination_labels' in saved_filter_params: draw_termination_labels = saved_filter_params['draw_termination_labels']
-                    if draw_cable_labels == False and 'draw_cable_labels' in saved_filter_params: draw_cable_labels = saved_filter_params['draw_cable_labels']
-                    if grid_size == 0 and 'grid_size' in saved_filter_params: grid_size = saved_filter_params['grid_size']
-                    if node_label_items == () and 'node_label_items' in saved_filter_params: node_label_items = saved_filter_params['node_label_items']
-                except SavedFilter.DoesNotExist: # filter_id not found
-                    pass
-                except Exception as inst:
-                    print(type(inst))
-
             if 'group' not in request.query_params:
-                if 'saved_filter_params' in locals() and "group" in saved_filter_params:
-                    group_id = saved_filter_params['group'][0]
-                else:
-                    group_id = "default"
+                group_id = "default"
             else:
                 group_id = request.query_params["group"]
             topo_data = get_topology_data(
@@ -201,26 +169,22 @@ class SaveRoleImageViewSet(ReadOnlyModelViewSet):
                 {"status": "Missing or malformed request body"}, status=400
             )
 
-        if sys.version_info >= (3,9,0):
-            device_roles = {
-                k: v.removeprefix(settings.STATIC_URL)
-                for k, v in request.data.items()
-                if k.isnumeric()}
-            content_type_ids = {
-                k[2:]: v.removeprefix(settings.STATIC_URL)
-                for k, v in request.data.items()
-                if k.startswith("ct") and k[2:].isnumeric()
-            }
-        else:
-            device_roles = {}
-            for k, v in request.data.items():
-                if k.isdigit() and v.startswith(settings.STATIC_URL):
-                    device_roles[k] = v[len(settings.STATIC_URL):]
+        def _is_uuid(s):
+            try:
+                uuid.UUID(s)
+                return True
+            except (ValueError, AttributeError):
+                return False
 
-            content_type_ids = {}
-            for k, v in request.data.items():
-                if k.startswith("ct") and k[2:].isdigit() and v.startswith(settings.STATIC_URL):
-                    content_type_ids[k[2:]] = v[len(settings.STATIC_URL):]
+        device_roles = {
+            k: v.removeprefix(settings.STATIC_URL)
+            for k, v in request.data.items()
+            if _is_uuid(k)}
+        content_type_ids = {
+            k[2:]: v.removeprefix(settings.STATIC_URL)
+            for k, v in request.data.items()
+            if k.startswith("ct") and k[2:].isnumeric()
+        }
 
         roles: Dict[int, Role] = Role.objects.in_bulk(device_roles.keys())
         content_types: Dict[int, ContentType] = ContentType.objects.in_bulk(
@@ -246,21 +210,16 @@ class SaveRoleImageViewSet(ReadOnlyModelViewSet):
 
             for id, url in device_roles.items():
                 RoleImage.objects.update_or_create(
-                    {
-                        "content_type_id": device_role_ct.pk,
-                        "object_id": id,
-                        "image": str(get_image_from_url(url)),
-                    },
+                    defaults={"image": str(get_image_from_url(url))},
+                    content_type_id=device_role_ct.pk,
                     object_id=id,
                 )
 
         for content_type_id, url in content_type_ids.items():
             RoleImage.objects.update_or_create(
-                {
-                    "content_type_id": content_type_id,
-                    "image": str(get_image_from_url(url)),
-                },
+                defaults={"image": str(get_image_from_url(url))},
                 content_type_id=content_type_id,
+                object_id=None,
             )
 
         return JsonResponse({"status": "Ok"})

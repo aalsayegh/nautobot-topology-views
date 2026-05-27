@@ -1,5 +1,6 @@
-from nautobot.dcim.models import Device, Role
-from rest_framework.serializers import ModelSerializer
+from nautobot.dcim.models import Device
+from nautobot.extras.models import Role
+from rest_framework.serializers import ModelSerializer, SerializerMethodField
 from nautobot.apps.api import NautobotModelSerializer
 
 from nautobot_topology_views.models import RoleImage, IndividualOptions, CoordinateGroup, Coordinate, CircuitCoordinate, PowerPanelCoordinate, PowerFeedCoordinate
@@ -12,6 +13,11 @@ class TopologyDummySerializer(ModelSerializer):
 
 
 class RoleImageSerializer(ModelSerializer):
+    role = SerializerMethodField()
+
+    def get_role(self, obj):
+        return {"slug": obj.role_data.slug, "name": obj.role_data.name}
+
     class Meta:
         model = RoleImage
         fields = ("role", "image")

@@ -4,8 +4,8 @@ const mapping = {}
 
 document.querySelector('form#images').addEventListener('submit', async (e) => {
     e.preventDefault()
-    try {        
-        const res = await fetch('/' + basePath + 'api/plugins/nautobot_topology_views/images/save/', {
+    try {
+        const res = await fetch('/' + basePath + 'api/plugins/topology-views/images/save/', {
             method: 'POST',
             body: JSON.stringify(mapping),
             headers: {

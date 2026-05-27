@@ -1,4 +1,4 @@
-{% extends 'generic/object.html' %}
+{% extends 'generic/object_detail.html' %}
 {% load helpers %}
 {% load plugins %}
 {% load render_table from django_tables2 %}
@@ -28,7 +28,7 @@
     {% plugin_left_page object %}
   </div>
 	<div class="col col-md-6">
-    {% include 'inc/panels/custom_fields.html' %}
+    {% include 'inc/custom_fields_panel.html' %}
     {% plugin_right_page object %}
 	</div>
 </div>
@@ -37,7 +37,7 @@
     <div class="card">
       <h5 class="card-header">Circuit Coordinates</h5>
       <div class="card-body table-responsive">
-        {% render_table circuitcoordinates_table %}
+        {% render_table circuitcoordinates_table 'inc/table.html' %}
       </div>
     </div>
   </div>
@@ -45,7 +45,7 @@
     <div class="card">
       <h5 class="card-header">Power Panel Coordinates</h5>
       <div class="card-body table-responsive">
-        {% render_table powerpanelcoordinates_table %}
+        {% render_table powerpanelcoordinates_table 'inc/table.html' %}
       </div>
     </div>
   </div>
@@ -53,7 +53,7 @@
     <div class="card">
       <h5 class="card-header">Power Feed Coordinates</h5>
       <div class="card-body table-responsive">
-        {% render_table powerfeedcoordinates_table %}
+        {% render_table powerfeedcoordinates_table 'inc/table.html' %}
       </div>
     </div>
   </div>
@@ -61,7 +61,7 @@
     <div class="card">
       <h5 class="card-header">Device Coordinates</h5>
       <div class="card-body table-responsive">
-        {% render_table coordinates_table %}
+        {% render_table coordinates_table 'inc/table.html' %}
       </div>
     </div>
   </div>

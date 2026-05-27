@@ -1,4 +1,4 @@
-{% extends 'generic/object.html' %}
+{% extends 'generic/object_detail.html' %}
 {% load helpers %}
 {% load plugins %}
 
@@ -35,7 +35,7 @@
     {% plugin_left_page object %}
   </div>
 	<div class="col col-md-6">
-    {% include 'inc/panels/custom_fields.html' %}
+    {% include 'inc/custom_fields_panel.html' %}
     {% plugin_right_page object %}
 	</div>
 </div>

@@ -2,7 +2,6 @@
 
 from nautobot.apps.search import SearchFilterSet
 
-from .filters import CoordinatesFilterSet
 from .models import Coordinate, CoordinateGroup
 
 

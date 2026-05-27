@@ -1,11 +1,18 @@
-from cProfile import label
-
 from django import forms
 from django.conf import settings
 from django.utils.translation import gettext as _
-from nautobot.apps.forms import NautobotBulkImportForm, NautobotFilterForm, NautobotModelForm
+from nautobot.apps.forms import (
+    CSVModelForm,
+    DynamicModelMultipleChoiceField,
+    NautobotFilterForm,
+    NautobotModelForm,
+    TagFilterField,
+    add_blank_choice,
+)
 from nautobot.circuits.models import Circuit
-from nautobot.dcim.choices import DeviceAirflowChoices, DeviceStatusChoices
+from nautobot.core.forms import BOOLEAN_WITH_BLANK_CHOICES
+from nautobot.dcim.choices import DeviceStatusChoices
+from nautobot.dcim.form_mixins import LocatableModelFilterFormMixin
 from nautobot.dcim.models import (
     Device,
     DeviceType,
@@ -15,18 +22,10 @@ from nautobot.dcim.models import (
     PowerFeed,
     PowerPanel,
     Rack,
-    Region,
-    Role,
-    Site,
-    SiteGroup,
 )
-from nautobot.extras.forms import LocalConfigContextFilterForm
-from nautobot.extras.models import ConfigTemplate
-from nautobot.tenancy.forms import ContactModelFilterForm, TenancyFilterForm
-from nautobot.tenancy.models import Tenant, TenantGroup
-from nautobot.utilities.forms import BOOLEAN_WITH_BLANK_CHOICES, add_blank_choice
-from nautobot.utilities.forms.fields import DynamicModelMultipleChoiceField, TagFilterField
-from nautobot.utilities.forms.rendering import FieldSet
+from nautobot.extras.forms import LocalContextFilterForm
+from nautobot.extras.models import Role
+from nautobot.tenancy.forms import TenancyFilterForm
 
 from nautobot_topology_views.choices import NodeLabelItems
 from nautobot_topology_views.models import (
@@ -40,36 +39,27 @@ from nautobot_topology_views.models import (
 
 
 class DeviceFilterForm(
-    LocalConfigContextFilterForm,
+    LocalContextFilterForm,
     TenancyFilterForm,
-    ContactModelFilterForm,
+    LocatableModelFilterFormMixin,
     NautobotFilterForm
 ):
     model = Device
-    fieldsets = (
-        FieldSet('q', 'filter_id', 'tag'),
-        FieldSet(
-            'group', 'ignore_cable_type', 'save_coords', 'show_unconnected', 'show_cables', 'show_wireless',
-            'show_logical_connections', 'show_single_cable_logical_conns', 'show_neighbors',
-            'group_sites', 'group_locations', 'group_racks', 'group_virtualchassis', 'straight_cables',
-            'draw_termination_labels', 'draw_cable_labels', 'grid_size', 'node_label_items', name=_("Options")
-        ),
-        FieldSet(
-            'show_circuit', 'show_power', name=_("Additional filter-independent types (non-devices)")
-        ),
-        FieldSet('id', name=_("Device")),
-        FieldSet('region_id', 'site_group_id', 'site_id', 'location_id', 'rack_id', name=_("Location")),
-        FieldSet('status', 'role_id', 'airflow', 'serial', 'asset_tag', 'mac_address', name=_("Operation")),
-        FieldSet('manufacturer_id', 'device_type_id', 'platform_id', name=_("Hardware")),
-        FieldSet('tenant_group_id', 'tenant_id', name=_("Tenant")),
-        FieldSet('contact', 'contact_role', 'contact_group', name=_("Contacts")),
-        FieldSet(
-            'console_ports', 'console_server_ports', 'power_ports', 'power_outlets', 'interfaces', 'pass_through_ports', name=_("Components")
-        ),
-        FieldSet(
-            'has_primary_ip', 'has_oob_ip', 'virtual_chassis_member', 'config_template_id', 'local_context_data', name=_("Miscellaneous")
-        ),
-    )
+    field_order = [
+        'q', 'filter_id', 'tag',
+        'group', 'ignore_cable_type', 'save_coords', 'show_unconnected', 'show_cables', 'show_wireless',
+        'show_logical_connections', 'show_single_cable_logical_conns', 'show_neighbors',
+        'group_sites', 'group_locations', 'group_racks', 'group_virtualchassis', 'straight_cables',
+        'draw_termination_labels', 'draw_cable_labels', 'grid_size', 'node_label_items',
+        'show_circuit', 'show_power',
+        'id',
+        'location_id', 'rack_id',
+        'status', 'role_id', 'serial', 'asset_tag', 'mac_address',
+        'manufacturer_id', 'device_type_id', 'platform_id',
+        'tenant_group_id', 'tenant_id',
+        'console_ports', 'console_server_ports', 'power_ports', 'power_outlets', 'interfaces', 'pass_through_ports',
+        'has_primary_ip', 'has_oob_ip', 'virtual_chassis_member', 'local_context_data',
+    ]
     group = forms.ModelChoiceField(
         queryset=CoordinateGroup.objects.all(),
         required=False,
@@ -81,51 +71,18 @@ class DeviceFilterForm(
         label=_('Device'),
         query_params={
             'location_id': '$location_id',
-            'region_id': '$region_id',
-            'site_group_id': '$site_group_id',
-            'site_id': '$site_id',
             'role_id': '$role_id',
-            'contact': '$contact',
-            'contact_role': '$contact_role',
-            'contact_group': '$contact_group',
         },
-    )
-    region_id = DynamicModelMultipleChoiceField(
-        queryset=Region.objects.all(),
-        required=False,
-        label=_('Region')
-    )
-    site_group_id = DynamicModelMultipleChoiceField(
-        queryset=SiteGroup.objects.all(),
-        required=False,
-        label=_('Site Group'),
-    )
-    site_id = DynamicModelMultipleChoiceField(
-        queryset=Site.objects.all(),
-        required=False,
-        query_params={
-            'region_id': '$region_id',
-            'group_id': '$site_group_id',
-        },
-        label=_('Site'),
     )
     location_id = DynamicModelMultipleChoiceField(
         queryset=Location.objects.all(),
         required=False,
-        query_params={
-            'region_id': '$region_id',
-            'site_group_id': '$site_group_id',
-            'site_id': '$site_id',
-        },
         label=_('Location'),
     )
     rack_id = DynamicModelMultipleChoiceField(
         queryset=Rack.objects.all(),
         required=False,
         query_params={
-            'region_id': '$region_id',
-            'site_group_id': '$site_group_id',
-            'site_id': '$site_id',
             'location_id': '$location_id',
         },
         label=_('Rack'),
@@ -139,11 +96,6 @@ class DeviceFilterForm(
         queryset=Role.objects.all(),
         required=False,
         label=_('Role')
-    )
-    airflow = forms.MultipleChoiceField(
-        label=_('Airflow'),
-        choices=add_blank_choice(DeviceAirflowChoices),
-        required=False
     )
     serial = forms.CharField(
         label=_('Serial'),
@@ -217,11 +169,6 @@ class DeviceFilterForm(
         widget=forms.Select(
             choices=BOOLEAN_WITH_BLANK_CHOICES
         )
-    )
-    config_template_id = DynamicModelMultipleChoiceField(
-        queryset=ConfigTemplate.objects.all(),
-        required=False,
-        label=_('Config template')
     )
     has_primary_ip = forms.NullBooleanField(
         required=False,
@@ -376,81 +323,62 @@ class DeviceFilterForm(
     )
 
 class CoordinateGroupsForm(NautobotModelForm):
-    fieldsets = (
-        FieldSet('name', 'description', name=_("Group Details")),
-    )
 
     class Meta:
         model = CoordinateGroup
         fields = ('name', 'description')
 
-class CoordinateGroupsImportForm(NautobotBulkImportForm):
+class CoordinateGroupsImportForm(CSVModelForm):
     class Meta:
         model = CoordinateGroup
         fields = ('name', 'description')
 
 class CircuitCoordinatesForm(NautobotModelForm):
-    fieldsets = (
-        FieldSet('group', 'device', 'x', 'y', name=_("Circuit Coordinate")),
-    )
 
     class Meta:
         model = CircuitCoordinate
         fields = ('group', 'device', 'x', 'y')
 
 class PowerPanelCoordinatesForm(NautobotModelForm):
-    fieldsets = (
-        FieldSet('group', 'device', 'x', 'y', name=_("Power Panel")),
-    )
 
     class Meta:
         model = PowerPanelCoordinate
         fields = ('group', 'device', 'x', 'y')
 
 class PowerFeedCoordinatesForm(NautobotModelForm):
-    fieldsets = (
-        FieldSet('group', 'device', 'x', 'y', name=_("PowerFeed Coordinate")),
-    )
 
     class Meta:
         model = PowerFeedCoordinate
         fields = ('group', 'device', 'x', 'y')
 
 class CoordinatesForm(NautobotModelForm):
-    fieldsets = (
-        FieldSet('group', 'device', 'x', 'y', name=_("Coordinate")),
-    )
 
     class Meta:
         model = Coordinate
         fields = ('group', 'device', 'x', 'y')
 
-class CircuitCoordinatesImportForm(NautobotBulkImportForm):
+class CircuitCoordinatesImportForm(CSVModelForm):
     class Meta:
         model = CircuitCoordinate
         fields = ('group', 'device', 'x', 'y')
 
-class PowerPanelCoordinatesImportForm(NautobotBulkImportForm):
+class PowerPanelCoordinatesImportForm(CSVModelForm):
     class Meta:
         model = PowerPanelCoordinate
         fields = ('group', 'device', 'x', 'y')
 
-class PowerFeedCoordinatesImportForm(NautobotBulkImportForm):
+class PowerFeedCoordinatesImportForm(CSVModelForm):
     class Meta:
         model = PowerFeedCoordinate
         fields = ('group', 'device', 'x', 'y')
 
-class CoordinatesImportForm(NautobotBulkImportForm):
+class CoordinatesImportForm(CSVModelForm):
     class Meta:
         model = Coordinate
         fields = ('group', 'device', 'x', 'y')
 
 class CircuitCoordinatesFilterForm(NautobotFilterForm):
     model = CircuitCoordinate
-    fieldsets = (
-        FieldSet('q', 'filter_id'),
-        FieldSet('group', 'device', 'x', 'y', name=_("Circuit Coordinates")),
-    )
 
     group = forms.ModelMultipleChoiceField(
         queryset=CoordinateGroup.objects.all(),
@@ -472,10 +400,6 @@ class CircuitCoordinatesFilterForm(NautobotFilterForm):
 
 class PowerPanelCoordinatesFilterForm(NautobotFilterForm):
     model = PowerPanelCoordinate
-    fieldsets = (
-        FieldSet('q', 'filter_id'),
-        FieldSet('group', 'device', 'x', 'y', name=_('PowerPanel Coordinates')),
-    )
 
     group = forms.ModelMultipleChoiceField(
         queryset=CoordinateGroup.objects.all(),
@@ -497,10 +421,6 @@ class PowerPanelCoordinatesFilterForm(NautobotFilterForm):
 
 class PowerFeedCoordinatesFilterForm(NautobotFilterForm):
     model = Coordinate
-    fieldsets = (
-        FieldSet('q', 'filter_id'),
-        FieldSet('group', 'device', 'x', 'y', name=_("PowerFeed Coordinates")),
-    )
 
     group = forms.ModelMultipleChoiceField(
         queryset=CoordinateGroup.objects.all(),
@@ -522,10 +442,6 @@ class PowerFeedCoordinatesFilterForm(NautobotFilterForm):
 
 class CoordinatesFilterForm(NautobotFilterForm):
     model = Coordinate
-    fieldsets = (
-        FieldSet('q', 'filter_id'),
-        FieldSet('group', 'device', 'x', 'y', name=_("Coordinates")),
-    )
 
     group = forms.ModelMultipleChoiceField(
         queryset=CoordinateGroup.objects.all(),
@@ -546,39 +462,6 @@ class CoordinatesFilterForm(NautobotFilterForm):
     )
 
 class IndividualOptionsForm(NautobotModelForm):
-    fieldsets = (
-            FieldSet
-            (
-                'ignore_cable_type',
-                'preselected_device_roles',
-                'preselected_tags',
-                'save_coords',
-                'show_unconnected',
-                'show_cables',
-                'show_wireless',
-                'show_logical_connections',
-                'show_single_cable_logical_conns',
-                'show_neighbors',
-                'group_sites',
-                'group_locations',
-                'group_racks',
-                'group_virtualchassis',
-                'draw_default_layout',
-                'straight_cables',
-                'draw_termination_labels',
-                'draw_cable_labels',
-                'grid_size',
-                'node_label_items',
-            ),
-           FieldSet
-           (
-                'show_circuit',
-                'show_power',
-                name=_("Additional filter-independent types (non-devices)")
-            ),
-    )
-
-    user_id = forms.CharField(widget=forms.HiddenInput())
 
     ignore_cable_type = forms.MultipleChoiceField(
         label=_('Ignore Termination Types'),
@@ -751,7 +634,7 @@ class IndividualOptionsForm(NautobotModelForm):
     class Meta:
         model = IndividualOptions
         fields = [
-            'user_id', 'ignore_cable_type', 'preselected_device_roles', 'preselected_tags',
+            'ignore_cable_type', 'preselected_device_roles', 'preselected_tags',
             'save_coords', 'show_unconnected', 'show_cables', 'show_wireless',
             'show_logical_connections', 'show_single_cable_logical_conns', 'show_neighbors',
             'group_sites', 'group_locations', 'group_racks', 'group_virtualchassis',
