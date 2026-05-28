@@ -5,7 +5,14 @@ The connections are based on the cables you created in Nautobot.
 Support to filter on name, location, tag and device role.  
 Options to export to xml (for draw.io/diagrams.net) or png.
 
-> **Note**: This app was originally developed for NetBox and has been converted to Nautobot 3.1.3.
+> **Note**: This Nautobot app is a port of [Netbox Topology Views](https://github.com/netbox-community/netbox-topology-views).  
+>
+> Original authors: @mattieserver and netbox-community members.  
+> Full list available at https://github.com/netbox-community/netbox-topology-views/graphs/contributors  
+>
+> Modifications:  
+> - Ported to Nautobot
+> - Minor UI tweaks
 
 ## Preview
 
@@ -20,27 +27,19 @@ Options to export to xml (for draw.io/diagrams.net) or png.
 
 ## Install
 
-The app is available as a Python package and can be installed with Poetry or pip.
+The app is available as a Python package and can be installed with Poetry.
 
 ### Using Poetry (Recommended)
 
 Add to your Nautobot's pyproject.toml:
 ```toml
 [tool.poetry.dependencies]
-nautobot-topology-views = "^1.0.0"
+nautobot-topology-views = "^4.5.1.0"
 ```
 
 Then run:
 ```bash
 poetry install
-nautobot-server migrate nautobot_topology_views
-nautobot-server collectstatic --no-input
-```
-
-### Using pip
-
-```bash
-pip install nautobot-topology-views
 nautobot-server migrate nautobot_topology_views
 nautobot-server collectstatic --no-input
 ```
@@ -72,33 +71,10 @@ systemctl restart nautobot
 
 ### Versions
 
-> [!NOTE]  
-> If the version of netbox is not listed here the plugin will most likely not work. Remove the plugin if you want to update netbox before this plugin has released an update for that netbox version.
+| Nautobot version | nautobot-topology-views version |
+| ---------------- | ------------------------------- |
+| = 3.1.X          | = v4.5.1.0                      |
 
-| netbox version | netbox-topology-views version |
-| -------------- | ----------------------------- |
-| = 4.5.X        | = v4.5.1                      |
-| = 4.4.X        | = v4.4.0                      |
-| = 4.3.X        | = v4.3.0                      |
-| = 4.2.1        | = v4.2.1                      |
-| = 4.2.0        | = v4.2.0                      |
-| = 4.1.X        | = v4.1.0                      |
-| = 4.0.X        | = v4.0.0                      |
-| = 3.7.0        | = v3.9.0                      |
-| = 3.6.4        | = v3.8.1                      |
-| = 3.6.0        | = v3.7.0                      |
-| = 3.5.0        | = v3.6.2                      |
-
-
-### Update
-
-Run `pip install netbox-topology-views --upgrade` in your venv.
-
-Run `python3 manage.py migrate netbox_topology_views`
-
-Run `python3 manage.py collectstatic --no-input`
-
-Clear you browser cache.
 
 ## Configure
 
@@ -108,24 +84,24 @@ All individual options can be assigned a default value per user directly in the 
 
 ![Individual Options](doc/img/topology_individual_options.png)
 
-The remaining options must be configured in the `PLUGINS_CONFIG` section of your `netbox/configuration.py`.
+The remaining options must be configured in the `PLUGINS_CONFIG` section of your `nautobot_config.py`.
 
 Example:
 ```
 PLUGINS_CONFIG = {
-    'netbox_topology_views': {
-        'static_image_directory': 'netbox_topology_views/img',
+    'nautobot_topology_views': {
+        'static_image_directory': 'nautobot_topology_views/img',
         'allow_coordinates_saving': True,
         'always_save_coordinates': True
     }
 }
 ```
 
-| Setting                  | Default value                                                                                                                                  | Description                                                                                                            |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| static_image_directory   | netbox_topology_views/img                                                                                                                      | (str or pathlib.Path) Specifies the location that images will be loaded from by default. Must be within `STATIC_ROOT`  |
-| allow_coordinates_saving | False                                                                                                                                          | (bool) Set to true if you want to enable the ability to save the coordinates.                           |
-| always_save_coordinates  | False                                                                                                                                          | (bool) Set if you want to enable the option to save coordinates by default. Setting allow_coordinates_saving to true is mandatory.                                             |
+| Setting                  | Default value                     | Description                                                                                                            |
+| ------------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| static_image_directory   | nautobot_topology_views/img       | (str or pathlib.Path) Specifies the location that images will be loaded from by default. Must be within `STATIC_ROOT`  |
+| allow_coordinates_saving | False                             | (bool) Set to true if you want to enable the ability to save the coordinates.                                          |
+| always_save_coordinates  | False                             | (bool) Set if you want to enable the option to save coordinates by default. Setting allow_coordinates_saving to true is mandatory. |
 
 ### Custom field: coordinates
 
@@ -155,13 +131,13 @@ Please note that values stored in the custom field "coordinates" are not being c
 
 ### Custom Images
 
-To change image with associated device use the `Images` page - it allows to map a device role with an image found in the NetBox static directory (defined by the plugin config `static_image_directory` which defaults to `netbox_topology_views/img`). You can also upload you own custom images to there - these images will automatically be used for a device (if it does not already have a specified image in the settings) if their name is the device role slug.
+To change image with associated device use the `Images` page - it allows to map a device role with an image found in the Nautobot static directory (defined by the plugin config `static_image_directory` which defaults to `nautobot_topology_views/img`). You can also upload you own custom images to there - these images will automatically be used for a device (if it does not already have a specified image in the settings) if their name is the device role slug.
 
 ![Images](doc/img/topology_images.png)
 
 ## Use
 
-Go to the plugins tab in the navbar and click topology or go to `$NETBOX_URL/plugins/netbox_topology_views/` to view your topologies
+Go to the plugins tab in the navbar and click topology or go to `$NAUTOBOT_URL/plugins/nautobot_topology_views/` to view your topologies
 
 Select your options for the topology view:
 
@@ -177,7 +153,7 @@ Select your options for the topology view:
     <dt>Show Cables</dt>
     <dd>Show connections between interfaces, front / rear ports, etc., that are connected with one or more cables. These connections are displayed as solid lines in the color of the cable.</dd> 
     <dt>Show Logical Connections</dt>
-    <dd>Show logical connections between interfaces (referred to as Interface Connections in NetBox) in the topology view. Where the path between
+    <dd>Show logical connections between interfaces (referred to as Interface Connections in Nautobot) in the topology view. Where the path between
         interfaces includes multiple cables (e.g., via patch panels), only the end interface connections are shown, not the 
         intermediate front / rear port connections, etc. This is similar to what was referred to as 'end-to-end' connections in previous versions. These connections are displayed as yellow dotted lines.</dd>
     <dt>Show redundant Cable and Logical Connection</dt>
@@ -194,12 +170,12 @@ Select your options for the topology view:
     
 ### Coordinates and Coordinate Groups
 
-Netbox Topology Views stores the position of the devices. In order to allow different representations for the topology, Coordinate Groups are supported.
+Nautobot Topology Views stores the position of the devices. In order to allow different representations for the topology, Coordinate Groups are supported.
 
 > Please read the "Configure" chapter to set the `allow_coordinates_saving` option to True.
 You might also set the `always_save_coordinates` option to True.
 
-Navigate to "Coordinate Groups" in the menu and create as many groups as you like. You can select a group later in the filter pane in order to show icon positions according to this group (see chapter "Use"). You can also omit creating a group if you don't need this feature. Netbox Topology Views automatically creates a group named "default" for you and stores all coordinates in this group, even if you do not select a group in the filter.
+Navigate to "Coordinate Groups" in the menu and create as many groups as you like. You can select a group later in the filter pane in order to show icon positions according to this group (see chapter "Use"). You can also omit creating a group if you don't need this feature. Nautobot Topology Views automatically creates a group named "default" for you and stores all coordinates in this group, even if you do not select a group in the filter.
 
 By default, the position of the devices are calculated with a physics engine. As soon as a device icon is dragged to another location, its position is saved and excluded from the calculation by the physics engine. All saved coordinates can be viewed and edited under the menu item "Coordinates".
 
@@ -207,35 +183,35 @@ By default, the position of the devices are calculated with a physics engine. As
 
 ### Permissions
 
-To view `/plugins/netbox_topology-views/topology` you need the following permissions:
+To view `/plugins/topology-views/topology` you need the following permissions:
  + dcim | device | can view device
  + dcim | site | can view site
  + extras | tag | can view tag
  + dcim | device role | can view device role
 
 To save `Coordinates` when moving icons:
- + netbox_topology_views | coordinate | change
+ + nautobot_topology_views | coordinate | change
 
-To view `/plugins/netbox_topology-views/images`:
+To view `/plugins/topology-views/images`:
  + dcim | site | view
  + dcim | device role | view
  + dcim | device role | add
  + dcim | device role | change
 
-To view `/plugins/netbox_topology-views/individualoptions`:
- + netbox_topology_views | individual options | change
+To view `/plugins/topology-views/individualoptions`:
+ + nautobot_topology_views | individual options | change
 
 Set `Coordinate Groups` according to your needs:
- + netbox_topology_views | coordinate groups | view/add/change/delete
+ + nautobot_topology_views | coordinate groups | view/add/change/delete
 
 Set `Coordinates` according to your needs:
- + netbox_topology_views | coordinate | view/add/change/delete
+ + nautobot_topology_views | coordinate | view/add/change/delete
 
 Set `Power Feed Coordinates` according to your needs:
- + netbox_topology_views | power feed coordinate | view/add/change/delete
+ + nautobot_topology_views | power feed coordinate | view/add/change/delete
 
 Set `Power Panel Coordinates` according to your needs:
- + netbox_topology_views | power panel coordinate | view/add/change/delete
+ + nautobot_topology_views | power panel coordinate | view/add/change/delete
 
 Set `Circuit Coordinates` according to your needs:
- + netbox_topology_views | circuit coordinate | view/add/change/delete
+ + nautobot_topology_views | circuit coordinate | view/add/change/delete

@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "nautobot-topology-views"
-version = "1.0.0"
+version = "4.5.1.0"
 description = "A Nautobot App to create Topology maps"
 readme = "README.md"
-authors = ["Mattijs Vanhaverbeke <author@example.com>"]
+authors = ["@mattieserver and netbox-community"]
 license = "Apache-2.0"
 homepage = "https://github.com/mattieserver/netbox-topology-views"
 repository = "https://github.com/mattieserver/netbox-topology-views"
@@ -13,6 +13,8 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Framework :: Django",
     "Framework :: Django :: 5.2",
 ]
