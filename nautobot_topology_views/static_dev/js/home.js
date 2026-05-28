@@ -33,7 +33,7 @@ function generatePortSVG(text) {
 	return 'data:image/svg+xml;charset=utf-8,' + 
     encodeURIComponent( 
         '<svg xmlns="http://www.w3.org/2000/svg" width="' + (svgWidth) + '" height="' + (svgHeight) + '">' +
-        '<rect x="' + rectX + '" y="' + rectY + '" rx="4" ry="4" width="' + (rectWidth) + '" height="' + (rectHeight) + '" fill="#ffdf3f" stroke="#ffc93f" stroke-width="' + (rectBorderWidth) + '" style="opacity:0.5"/>' +
+        '<rect x="' + rectX + '" y="' + rectY + '" rx="4" ry="4" width="' + (rectWidth) + '" height="' + (rectHeight) + '" fill="#ffdf3f" stroke="#ffc93f" stroke-width="' + (rectBorderWidth) + '"/>' +
         '<text x="' + textX + '" y="' + textY + '" font-family="' + fontFamily + '" font-size="' + (fontSize) + '" fill="black" text-anchor="middle" dominant-baseline="middle">' + text + '</text>' +
         '</svg>'
         )
@@ -481,31 +481,31 @@ const coordSaveCheckbox = document.querySelector('#id_save_coords')
 
     let groupedNodeSites = combineNodeInfo('site_id', 'site');
     let siteRectParams = {
-        lineWidth: "5", 
+        lineWidth: "3", 
         color: "red",
         paddingX: 84, 
         paddingY: 84, 
         textPaddingX: 8, 
         textPaddingY: -8, 
-        font: "14px helvetica",
+        font: "16px helvetica",
         category: "Site"
     }
     
     let groupedNodeLocations = combineNodeInfo('location_id', 'location');
     let locationRectParams = {
-        lineWidth: "5", 
+        lineWidth: "2", 
         color: "#337ab7",
         paddingX: 77, 
         paddingY: 77, 
         textPaddingX: 22, 
         textPaddingY: 29, 
-        font: "14px helvetica",
+        font: "15px helvetica",
         category: "Location"
     }
 
     let groupedNodeRacks = combineNodeInfo('rack_id', 'rack');
     let rackRectParams = {
-        lineWidth: "5", 
+        lineWidth: "1", 
         color: "green",
         paddingX: 70, 
         paddingY: 70, 
@@ -517,7 +517,7 @@ const coordSaveCheckbox = document.querySelector('#id_save_coords')
 
     let groupedNodeVirtualchassis = combineNodeInfo('virtual_chassis_id', 'virtual_chassis');
     let virtualchassisRectParams = {
-        lineWidth: "5", 
+        lineWidth: "1", 
         color: "orange",
         paddingX: 63, 
         paddingY: 63, 

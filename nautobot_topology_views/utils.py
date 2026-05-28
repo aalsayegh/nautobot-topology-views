@@ -1,4 +1,5 @@
 import base64
+import re
 import sys
 import xml.dom.minidom
 from dataclasses import dataclass
@@ -12,19 +13,33 @@ from django.db.models import Model
 from django.templatetags.static import static
 from django.utils.text import camel_case_to_spaces, re_camel_case
 
+_INTERFACE_ABBREV = [
+    (re.compile(r'^HundredGigabitEthernet', re.IGNORECASE), 'Hu'),
+    (re.compile(r'^FortyGigabitEthernet', re.IGNORECASE), 'Fo'),
+    (re.compile(r'^TwentyFiveGigabitEthernet', re.IGNORECASE), 'Twe'),
+    (re.compile(r'^TenGigabitEthernet', re.IGNORECASE), 'Te'),
+    (re.compile(r'^GigabitEthernet', re.IGNORECASE), 'Gi'),
+    (re.compile(r'^FastEthernet', re.IGNORECASE), 'Fa'),
+    (re.compile(r'^Ethernet', re.IGNORECASE), 'Et'),
+    (re.compile(r'^Loopback', re.IGNORECASE), 'Lo'),
+    (re.compile(r'^Vlan', re.IGNORECASE), 'Vl'),
+    (re.compile(r'^Management', re.IGNORECASE), 'Ma'),
+    (re.compile(r'^Port-Channel', re.IGNORECASE), 'Po'),
+]
+
+
+def abbreviate_interface_name(name: str) -> str:
+    for pattern, abbrev in _INTERFACE_ABBREV:
+        abbreviated, n = pattern.subn(abbrev, name, count=1)
+        if n:
+            return abbreviated
+    return name
+
+
 IMAGE_DIR = Path(settings.STATIC_ROOT) / "nautobot_topology_views/img"
-if sys.version_info >= (3,9,0):
-    CONF_IMAGE_DIR: Path = Path(settings.STATIC_ROOT) / settings.PLUGINS_CONFIG[
-        "nautobot_topology_views"
-    ]["static_image_directory"].removeprefix("/")
-else:
-    prefix = "/"
-    plugin_path = settings.PLUGINS_CONFIG["nautobot_topology_views"]["static_image_directory"]
-    if plugin_path.startswith(prefix):
-        plugin_path_new = plugin_path[len(prefix):]
-        CONF_IMAGE_DIR: Path = Path(settings.STATIC_ROOT) / plugin_path_new
-    else:
-        CONF_IMAGE_DIR: Path = Path(settings.STATIC_ROOT) / plugin_path
+CONF_IMAGE_DIR: Path = Path(settings.STATIC_ROOT) / settings.PLUGINS_CONFIG[
+    "nautobot_topology_views"
+]["static_image_directory"].removeprefix("/")
 
 
 def image_static_url(path: Path) -> str:

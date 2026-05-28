@@ -91,6 +91,7 @@ from nautobot_topology_views.utils import (
     CONF_IMAGE_DIR,
     IMAGE_FILETYPES,
     LinePattern,
+    abbreviate_interface_name,
     find_image_url,
     get_model_role,
     get_model_slug,
@@ -360,8 +361,8 @@ def create_edge(
 
     if draw_termination_labels is True:
         edge["drawTerminationLabel"] = True
-        edge["cable_a_name"] = cable_a_name
-        edge["cable_b_name"] = cable_b_name
+        edge["cable_a_name"] = abbreviate_interface_name(cable_a_name)
+        edge["cable_b_name"] = abbreviate_interface_name(cable_b_name)
 
 
     return edge
