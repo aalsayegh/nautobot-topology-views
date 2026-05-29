@@ -13,6 +13,7 @@ Options to export to xml (for draw.io/diagrams.net) or png.
 > Modifications:  
 > - Ported to Nautobot
 > - Minor UI tweaks
+> - Reduce groups overlap
 
 ## Preview
 

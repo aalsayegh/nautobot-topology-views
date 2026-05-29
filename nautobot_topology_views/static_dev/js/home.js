@@ -526,6 +526,103 @@ const coordSaveCheckbox = document.querySelector('#id_save_coords')
         font: "14px helvetica",
         category: "Virtual Chassis"
     }
+
+    // After physics stabilises, iteratively push group bounding-boxes apart so
+    // location/rack/site/virtualchassis rectangles no longer overlap.
+    function separateGroups() {
+        const allGroupData = [];
+
+        function buildGroupData(groupedNodes, padding) {
+            for (let nodeArray of groupedNodes) {
+                if (nodeArray.length === 0) continue;
+                const nodePositions = nodeArray.map(n => ({
+                    id: n[0],
+                    x: graph.getPosition(n[0]).x,
+                    y: graph.getPosition(n[0]).y
+                }));
+                allGroupData.push({ nodePositions, padding });
+            }
+        }
+
+        if (group_sites === 'on') buildGroupData(groupedNodeSites, 95);
+        if (group_locations === 'on') buildGroupData(groupedNodeLocations, 88);
+        if (group_racks === 'on') buildGroupData(groupedNodeRacks, 81);
+        if (group_virtualchassis === 'on') buildGroupData(groupedNodeVirtualchassis, 74);
+
+        if (allGroupData.length < 2) return;
+
+        function getBBox(group) {
+            const xs = group.nodePositions.map(n => n.x);
+            const ys = group.nodePositions.map(n => n.y);
+            return {
+                minX: Math.min(...xs) - group.padding,
+                maxX: Math.max(...xs) + group.padding,
+                minY: Math.min(...ys) - group.padding,
+                maxY: Math.max(...ys) + group.padding
+            };
+        }
+
+        const maxIterations = 100;
+        for (let iter = 0; iter < maxIterations; iter++) {
+            let anyOverlap = false;
+
+            for (let i = 0; i < allGroupData.length; i++) {
+                for (let j = i + 1; j < allGroupData.length; j++) {
+                    const b1 = getBBox(allGroupData[i]);
+                    const b2 = getBBox(allGroupData[j]);
+
+                    const overlapX = Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX);
+                    const overlapY = Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY);
+
+                    if (overlapX > 0 && overlapY > 0) {
+                        anyOverlap = true;
+
+                        const c1X = (b1.minX + b1.maxX) / 2;
+                        const c1Y = (b1.minY + b1.maxY) / 2;
+                        const c2X = (b2.minX + b2.maxX) / 2;
+                        const c2Y = (b2.minY + b2.maxY) / 2;
+
+                        // Push apart along the axis of least overlap to minimise movement
+                        let dx, dy;
+                        if (overlapX < overlapY) {
+                            const sep = overlapX / 2 + 5;
+                            dx = c1X < c2X ? -sep : sep;
+                            dy = 0;
+                        } else {
+                            const sep = overlapY / 2 + 5;
+                            dx = 0;
+                            dy = c1Y < c2Y ? -sep : sep;
+                        }
+
+                        allGroupData[i].nodePositions.forEach(n => { n.x += dx; n.y += dy; });
+                        allGroupData[j].nodePositions.forEach(n => { n.x -= dx; n.y -= dy; });
+                    }
+                }
+            }
+
+            if (!anyOverlap) break;
+        }
+
+        // Commit the new positions into vis-network (physics disabled so they stick)
+        const updates = [];
+        allGroupData.forEach(group => {
+            group.nodePositions.forEach(n => {
+                updates.push({ id: n.id, x: n.x, y: n.y, physics: false });
+            });
+        });
+        window.nodes.update(updates);
+        graph.fit();
+    }
+
+    const needsGroupSeparation =
+        (group_sites === 'on' && groupedNodeSites.length > 1) ||
+        (group_locations === 'on' && groupedNodeLocations.length > 1) ||
+        (group_racks === 'on' && groupedNodeRacks.length > 1) ||
+        (group_virtualchassis === 'on' && groupedNodeVirtualchassis.length > 1);
+
+    if (needsGroupSeparation) {
+        graph.once('stabilizationIterationsDone', separateGroups);
+    }
 })()
 
 // Download Graph
