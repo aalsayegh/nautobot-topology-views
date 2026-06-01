@@ -1,5 +1,7 @@
 # Nautobot Topology Views App
 
+[![PyPI](https://img.shields.io/pypi/v/nautobot-topology-views)](https://pypi.org/project/nautobot-topology-views/)
+
 Create topology views/maps from your devices in Nautobot.
 The connections are based on the cables you created in Nautobot.
 Support to filter on name, location, tag and device role.  
