@@ -18,7 +18,6 @@ Options to export to xml (for draw.io/diagrams.net) or png.
 ## Preview
 
 ![Topology with light mode](doc/img/topology_light.png)
-![Topology with dark mode](doc/img/topology_dark.png)
 
 ## Requirements
 
