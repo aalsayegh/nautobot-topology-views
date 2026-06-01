@@ -35,14 +35,6 @@ from nautobot.dcim.models import (
 from nautobot.extras.models import Role, Tag
 from nautobot.extras.views import ObjectChangeLogView
 
-
-class UUIDEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, uuid.UUID):
-            return str(obj)
-        return super().default(obj)
-
-
 import nautobot_topology_views.models
 from nautobot_topology_views.choices import NodeLabelItems
 from nautobot_topology_views.filters import (
@@ -98,6 +90,13 @@ from nautobot_topology_views.utils import (
     get_query_settings,
     image_static_url,
 )
+
+
+class UUIDEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        return super().default(obj)
 
 
 def get_image_for_entity(entity: Union[Device, Circuit, PowerPanel, PowerFeed]):
