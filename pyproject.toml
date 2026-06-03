@@ -3,10 +3,10 @@ name = "nautobot-topology-views"
 version = "4.5.1.1"
 description = "A Nautobot App to create Topology maps"
 readme = "README.md"
-authors = ["@mattieserver and netbox-community"]
+authors = ["@mattieserver", "netbox-community", "@gioccher"]
 license = "Apache-2.0"
-homepage = "https://github.com/mattieserver/netbox-topology-views"
-repository = "https://github.com/mattieserver/netbox-topology-views"
+homepage = "https://github.com/gioccher/nautobot-topology-views"
+repository = "https://github.com/gioccher/nautobot-topology-views"
 keywords = ["nautobot", "nautobot-app", "topology"]
 classifiers = [
     "Intended Audience :: Developers",
