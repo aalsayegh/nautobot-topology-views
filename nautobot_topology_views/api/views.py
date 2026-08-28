@@ -88,15 +88,17 @@ class SaveCoordsViewSet(ReadOnlyModelViewSet):
         try:
             if CoordinateGroup.objects.filter(pk=group_id):
                 group = CoordinateGroup.objects.get(pk=group_id)
-                # Hen-and-egg-problem. Thanks, Django! By default, Django updates records that
-                # already exist and inserts otherwise. This does not work with our
-                # unique_together key if no pk is given. But: No record, no pk.
-                if not model_class.objects.filter(group=group, device=actual_device):
-                    # Unique group/device pair does not exist. Prepare new data set
+                # Update the existing row in place, or create one. Re-instantiating
+                # with an existing pk (the previous approach) breaks on Nautobot's
+                # PrimaryModel: the fresh instance carries created=None, so the
+                # UPDATE writes NULL into a non-null column and every re-save of an
+                # already-pinned node failed with a 500.
+                coords = model_class.objects.filter(group=group, device=actual_device).first()
+                if coords is None:
                     coords = model_class(group=group, device=actual_device, x=x_coord, y=y_coord)
                 else:
-                    # Unique group/device pair already exists. Update data
-                    coords = model_class(pk=model_class.objects.get(group=group, device=actual_device).pk, group=group, device=actual_device, x=x_coord, y=y_coord)
+                    coords.x = x_coord
+                    coords.y = y_coord
                 coords.save()
         except:
             return Response(
