@@ -49,22 +49,29 @@ class SaveCoordsViewSet(ReadOnlyModelViewSet):
         y_coord = request.data.get("y", None)
         group_id = request.data.get("group", "None")
 
-        actual_device = None
-        if device_id.startswith("c"):
-            device_id = device_id.lstrip("c")
-            actual_device = Circuit.objects.get(id=device_id)
-            model_name = 'CircuitCoordinate'
-        elif device_id.startswith("p"):
-            device_id = device_id.lstrip("p")
-            actual_device = PowerPanel.objects.get(id=device_id)
-            model_name = 'PowerPanelCoordinate'
-        elif device_id.startswith("f"):
-            device_id = device_id.lstrip("f")
-            actual_device = PowerFeed.objects.get(id=device_id)
-            model_name = 'PowerFeedCoordinate'
-        elif device_id.isnumeric():
-            actual_device = Device.objects.get(id=device_id)
-            model_name = 'Coordinate'
+        # Nautobot PKs are UUIDs (never numeric, and they may legitimately
+        # start with 'c'/'p'/'f'). A bare id that parses as a UUID is a
+        # device; the c/p/f prefixes mark circuit / power-panel / power-feed
+        # nodes, whose remainder must itself parse as a UUID.
+        def _resolve(node_id):
+            try:
+                return Device.objects.get(pk=uuid.UUID(node_id)), "Coordinate"
+            except (ValueError, Device.DoesNotExist):
+                pass
+            prefixed = {
+                "c": (Circuit, "CircuitCoordinate"),
+                "p": (PowerPanel, "PowerPanelCoordinate"),
+                "f": (PowerFeed, "PowerFeedCoordinate"),
+            }
+            model, prefixed_name = prefixed.get(node_id[:1], (None, None))
+            if model is not None:
+                try:
+                    return model.objects.get(pk=uuid.UUID(node_id[1:])), prefixed_name
+                except (ValueError, model.DoesNotExist):
+                    pass
+            return None, None
+
+        actual_device, model_name = _resolve(device_id) if device_id else (None, None)
 
         if not actual_device:
             return Response({"status": "invalid node_id in body"}, status=400)
