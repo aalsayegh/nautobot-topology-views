@@ -490,14 +490,17 @@ def get_topology_data(
                 termination_b = create_circuit_termination(
                     circuit_termination.cable.b_terminations[0]
                 )
-            elif circuit_termination.termination is not None:
+            elif getattr(circuit_termination, "provider_network", None) is not None:
+                # Nautobot has no generic CircuitTermination.termination attribute
+                # (a NetBox-ism); the non-cable case that matters here is a
+                # termination pointing at a provider network.
                 if (
-                    circuit_termination.termination_id
+                    circuit_termination.provider_network_id
                     not in nodes_provider_networks
                 ):
                     nodes_provider_networks[
-                        circuit_termination.termination.pk
-                    ] = circuit_termination.termination
+                        circuit_termination.provider_network.pk
+                    ] = circuit_termination.provider_network
 
             if bool(termination_a) and bool(termination_b):
                 circuit_model = {
