@@ -138,8 +138,9 @@ def create_node(
             node_content += (
                 f"<tr><th>Provider: </th><td>{device.provider.name}</td></tr>"
             )
-        if device.type is not None:
-            node_content += f"<tr><th>Type: </th><td>{device.type.name}</td></tr>"
+        circuit_type = getattr(device, "circuit_type", None) or getattr(device, "type", None)
+        if circuit_type is not None:
+            node_content += f"<tr><th>Type: </th><td>{circuit_type.name}</td></tr>"
     elif isinstance(device, PowerPanel):
         dev_name = device.name
         node["id"] = f"p{device.pk}"
@@ -373,6 +374,19 @@ def create_edge(
     return edge
 
 
+def cable_side_endpoints(cable, side):
+    """Endpoint objects on one cable side ('a'/'b') across Nautobot versions.
+
+    Nautobot 3.2's terminations_a/terminations_b return CableToCableTermination
+    join rows (each carrying .termination); the older NetBox-style
+    a_terminations/b_terminations were the endpoint objects directly.
+    """
+    rows = getattr(cable, f"terminations_{side}", None)
+    if rows is not None:
+        return [r.termination for r in rows if getattr(r, "termination", None) is not None]
+    return list(getattr(cable, f"{side}_terminations", []) or [])
+
+
 def create_circuit_termination(termination):
     if isinstance(termination, CircuitTermination):
         return {
@@ -483,13 +497,13 @@ def get_topology_data(
             termination_a = {}
             termination_b = {}
             circuit_model = {}
-            if circuit_termination.cable is not None and bool(circuit_termination.cable.a_terminations) and bool(circuit_termination.cable.b_terminations):
-                termination_a = create_circuit_termination(
-                    circuit_termination.cable.a_terminations[0]
-                )
-                termination_b = create_circuit_termination(
-                    circuit_termination.cable.b_terminations[0]
-                )
+            cable_endpoints_a = cable_endpoints_b = []
+            if circuit_termination.cable is not None:
+                cable_endpoints_a = cable_side_endpoints(circuit_termination.cable, "a")
+                cable_endpoints_b = cable_side_endpoints(circuit_termination.cable, "b")
+            if bool(cable_endpoints_a) and bool(cable_endpoints_b):
+                termination_a = create_circuit_termination(cable_endpoints_a[0])
+                termination_b = create_circuit_termination(cable_endpoints_b[0])
             elif getattr(circuit_termination, "provider_network", None) is not None:
                 # Nautobot has no generic CircuitTermination.termination attribute
                 # (a NetBox-ism); the non-cable case that matters here is a
@@ -522,8 +536,8 @@ def get_topology_data(
 
                 circuit_has_connections = False
                 for termination in [
-                    circuit_termination.cable.a_terminations[0],
-                    circuit_termination.cable.b_terminations[0],
+                    cable_endpoints_a[0],
+                    cable_endpoints_b[0],
                 ]:
                     if not isinstance(termination, CircuitTermination):
                         if (
