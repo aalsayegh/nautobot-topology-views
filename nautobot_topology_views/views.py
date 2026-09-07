@@ -33,6 +33,7 @@ from nautobot.dcim.models import (
     RearPort,
 )
 from nautobot.extras.models import Role, Tag
+from nautobot.virtualization.models import VirtualMachine
 from nautobot.extras.views import ObjectChangeLogView
 
 # Nautobot 3.2 replaced the Cable termination GFK fields and the PathEndpoint
@@ -50,6 +51,7 @@ from nautobot_topology_views.filters import (
     DeviceFilterSet,
     PowerFeedCoordinateFilterSet,
     PowerPanelCoordinateFilterSet,
+    VirtualMachineCoordinateFilterSet,
 )
 from nautobot_topology_views.forms import (
     CircuitCoordinatesFilterForm,
@@ -68,6 +70,9 @@ from nautobot_topology_views.forms import (
     PowerPanelCoordinatesFilterForm,
     PowerPanelCoordinatesForm,
     PowerPanelCoordinatesImportForm,
+    VirtualMachineCoordinatesFilterForm,
+    VirtualMachineCoordinatesForm,
+    VirtualMachineCoordinatesImportForm,
 )
 from nautobot_topology_views.models import (
     CircuitCoordinate,
@@ -77,6 +82,7 @@ from nautobot_topology_views.models import (
     PowerFeedCoordinate,
     PowerPanelCoordinate,
     RoleImage,
+    VirtualMachineCoordinate,
 )
 from nautobot_topology_views.tables import (
     CircuitCoordinateListTable,
@@ -84,12 +90,14 @@ from nautobot_topology_views.tables import (
     CoordinateListTable,
     PowerFeedCoordinateListTable,
     PowerPanelCoordinateListTable,
+    VirtualMachineCoordinateListTable,
 )
 from nautobot_topology_views.utils import (
     CONF_IMAGE_DIR,
     IMAGE_FILETYPES,
     LinePattern,
     abbreviate_interface_name,
+    find_image_in_dir,
     find_image_url,
     get_model_role,
     get_model_slug,
@@ -105,24 +113,39 @@ class UUIDEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def get_image_for_entity(entity: Union[Device, Circuit, PowerPanel, PowerFeed]):
-    is_device = isinstance(entity, Device)
+def get_image_for_virtual_machine(vm: VirtualMachine):
+    """A VM role with an icon of its own wins; otherwise the generic VM icon.
+
+    Never role-unknown: a VM without a role is still a VM, and drawing it as
+    an unknown thing would hide the one fact the node exists to show.
+    """
+    if vm.role is not None and find_image_in_dir(vm.role.name, CONF_IMAGE_DIR):
+        return find_image_url(vm.role.name)
+    return find_image_url("virtual-machine")
+
+
+def get_image_for_entity(entity: Union[Device, VirtualMachine, Circuit, PowerPanel, PowerFeed]):
+    # Devices and virtual machines share extras.Role, so a role image set for
+    # a role applies to both.
+    has_role = isinstance(entity, (Device, VirtualMachine))
     query = (
         {"content_type_id": ContentType.objects.get_for_model(Role).pk, "object_id": entity.role_id}
-        if is_device
+        if has_role
         else {"content_type_id": ContentType.objects.get_for_model(entity).pk, "object_id": None}
     )
 
     try:
         return RoleImage.objects.get(**query).get_image_url()
     except RoleImage.DoesNotExist:
+        if isinstance(entity, VirtualMachine):
+            return get_image_for_virtual_machine(entity)
         return find_image_url(
-            entity.role.name if is_device else get_model_slug(entity.__class__)
+            entity.role.name if has_role else get_model_slug(entity.__class__)
         )
 
 
 def create_node(
-    device: Union[Device, Circuit, PowerPanel, PowerFeed],
+    device: Union[Device, VirtualMachine, Circuit, PowerPanel, PowerFeed],
     save_coords: bool,
     node_label_items: list,
     group_id="default"
@@ -169,6 +192,35 @@ def create_node(
             node_content += f"<tr><th>Amperage: </th><td>{device.amperage}</td></tr>"
         if device.voltage is not None:
             node_content += f"<tr><th>Voltage: </th><td>{device.voltage}</td></tr>"
+    elif isinstance(device, VirtualMachine):
+        dev_name = device.name
+        node["id"] = f"v{device.pk}"
+        model_name = 'VirtualMachineCoordinate'
+        cluster = device.cluster
+
+        node_content += (
+            f"<tr><th>Virtual machine on: </th><td>{cluster.name} ({cluster.cluster_type.name})</td></tr>"
+        )
+        if device.role is not None:
+            node_content += f"<tr><th>Role: </th><td>{device.role.name}</td></tr>"
+        if device.status is not None:
+            node_content += f"<tr><th>Status: </th><td>{device.status.name}</td></tr>"
+        if device.vcpus is not None:
+            node_content += f"<tr><th>vCPUs: </th><td>{device.vcpus}</td></tr>"
+        if device.memory is not None:
+            node_content += f"<tr><th>Memory: </th><td>{device.memory} MB</td></tr>"
+        if device.disk is not None:
+            node_content += f"<tr><th>Disk: </th><td>{device.disk} GB</td></tr>"
+        if device.primary_ip is not None:
+            node_content += f"<tr><th>IP Address: </th><td>{device.primary_ip.address}</td></tr>"
+        if cluster.location is not None:
+            node_content += f"<tr><th>Location: </th><td>{cluster.location.name}</td></tr>"
+            # Group rectangles are drawn from these; a VM sits where its cluster sits.
+            node["location"] = cluster.location.name
+            node["location_id"] = cluster.location_id
+
+        if device.role is not None and device.role.color != "":
+            node["color.border"] = "#" + device.role.color
     else:
         model_name = 'Coordinate'
         dev_name = device.name
@@ -298,6 +350,7 @@ def create_edge(
     wireless: Optional[Dict] = None,
     power: Optional[bool] = None,
     interface: Optional[Interface] = None,
+    virtual: Optional[Dict] = None,
 ):
     cable_a_name = (
         "device A name unknown"
@@ -338,6 +391,13 @@ def create_edge(
     elif power is not None:
         edge["dashes"] = LinePattern().power
         title = "Power Connection"
+
+    elif virtual is not None:
+        # Not a cable: the VM runs on the host. Drawn dashed in its own colour so
+        # nobody reads copper into it.
+        edge["dashes"] = LinePattern().virtual
+        edge["color"] = '#8e44ad'
+        title = f"Virtual machine on cluster {virtual['cluster_name']} ({virtual['cluster_type']})"
 
     elif interface is not None:
         title = "Interface Connection"
@@ -420,6 +480,7 @@ def get_topology_data(
     show_neighbors: bool,
     show_power: bool,
     show_wireless: bool,
+    show_virtual_machines: bool,
     group_sites: bool,
     group_locations: bool,
     group_racks: bool,
@@ -447,6 +508,7 @@ def get_topology_data(
     nodes_circuits: Dict[int, Circuit] = {}
     nodes_powerpanel: Dict[int, PowerPanel] = {}
     nodes_powerfeed: Dict[int, PowerFeed] = {}
+    nodes_vms: Dict[uuid.UUID, VirtualMachine] = {}
     nodes_provider_networks = {}
     cable_ids = DefaultDict(dict)
     interface_ids = DefaultDict(dict)
@@ -756,6 +818,54 @@ def get_topology_data(
     #             )
     #         )
 
+    if show_virtual_machines:
+        # A VM hangs off every device assigned to its cluster, the way a client
+        # hangs off a switch port. A failover cluster has several hosts and the VM
+        # may run on any of them, so it gets one edge per host. Hosts come from
+        # the filtered device set, so a VM never drags in a host the filter
+        # excluded; a host with VMs is connected by them and is drawn even when
+        # nothing else is cabled to it.
+        hosts = (
+            Device.objects.filter(pk__in=device_ids, cluster_assignments__isnull=False)
+            .distinct()
+            .prefetch_related("clusters__cluster_type")
+        )
+        for host in hosts:
+            for cluster in host.clusters.all():
+                vms = VirtualMachine.objects.filter(cluster=cluster).select_related(
+                    "cluster__cluster_type", "cluster__location", "role", "status", "primary_ip4", "primary_ip6"
+                )
+                for vm in vms:
+                    if host.pk not in nodes_devices:
+                        nodes_devices[host.pk] = host
+                    nodes_vms[vm.pk] = vm
+
+                    edge_ids += 1
+                    termination_a = {
+                        "termination_name": cluster.cluster_type.name,
+                        "termination_device_name": host.name,
+                        "device_id": host.pk,
+                    }
+                    termination_b = {
+                        "termination_name": "vm",
+                        "termination_device_name": vm.name,
+                        "device_id": f"v{vm.pk}",
+                    }
+                    edges.append(
+                        create_edge(
+                            edge_id=edge_ids,
+                            termination_a=termination_a,
+                            termination_b=termination_b,
+                            virtual={"cluster_name": cluster.name, "cluster_type": cluster.cluster_type.name},
+                            straight_cables=straight_cables,
+                            draw_termination_labels=draw_termination_labels,
+                            draw_cable_labels=draw_cable_labels,
+                        )
+                    )
+
+        for vm in nodes_vms.values():
+            nodes.append(create_node(vm, save_coords, node_label_items, group_id))
+
     if group_locations:
         options['group_locations'] = 'on'
     if group_racks:
@@ -807,7 +917,7 @@ class TopologyHomeView(PermissionRequiredMixin, View):
 
         if request.GET:
 
-            filter_id, ignore_cable_type, save_coords, show_unconnected, show_power, show_circuit, show_logical_connections, show_single_cable_logical_conns, show_cables, show_wireless, group_sites, group_locations, group_racks, group_virtualchassis, group, show_neighbors, straight_cables, draw_termination_labels, draw_cable_labels, grid_size, node_label_items = get_query_settings(request)
+            filter_id, ignore_cable_type, save_coords, show_unconnected, show_power, show_circuit, show_logical_connections, show_single_cable_logical_conns, show_cables, show_wireless, group_sites, group_locations, group_racks, group_virtualchassis, group, show_neighbors, straight_cables, draw_termination_labels, draw_cable_labels, grid_size, node_label_items, show_virtual_machines = get_query_settings(request)
 
             filter_required = True
             empty_result = False
@@ -833,6 +943,7 @@ class TopologyHomeView(PermissionRequiredMixin, View):
                     show_circuit=show_circuit,
                     show_power=show_power,
                     show_wireless=show_wireless,
+                    show_virtual_machines=show_virtual_machines,
                     group_sites=group_sites,
                     group_locations=group_locations,
                     group_racks=group_racks,
@@ -869,6 +980,7 @@ class TopologyHomeView(PermissionRequiredMixin, View):
             if individualOptions.show_circuit: q['show_circuit'] = "True"
             if individualOptions.show_power: q['show_power'] = "True"
             if individualOptions.show_wireless: q['show_wireless'] = "True"
+            if individualOptions.show_virtual_machines: q['show_virtual_machines'] = "True"
             if individualOptions.group_sites: q['group_sites'] = "True"
             if individualOptions.group_locations: q['group_locations'] = "True"
             if individualOptions.group_racks: q['group_racks'] = "True"
@@ -956,6 +1068,7 @@ class LocationTopologyView(PermissionRequiredMixin, View):
             show_circuit=individualOptions.show_circuit,
             show_power=individualOptions.show_power,
             show_wireless=individualOptions.show_wireless,
+            show_virtual_machines=individualOptions.show_virtual_machines,
             group_sites=individualOptions.group_sites,
             group_locations=individualOptions.group_locations,
             group_racks=individualOptions.group_racks,
@@ -1166,6 +1279,48 @@ class PowerFeedCoordinateChangeLogView(PermissionRequiredMixin, ObjectChangeLogV
 
     queryset = PowerFeedCoordinate.objects.all()
 
+class VirtualMachineCoordinateView(PermissionRequiredMixin, ObjectView):
+    permission_required = 'nautobot_topology_views.view_coordinate'
+
+    queryset = VirtualMachineCoordinate.objects.all()
+
+class VirtualMachineCoordinateAddView(PermissionRequiredMixin, ObjectEditView):
+    permission_required = 'nautobot_topology_views.add_coordinate'
+
+    queryset = VirtualMachineCoordinate.objects.all()
+    model_form = VirtualMachineCoordinatesForm
+    template_name = 'nautobot_topology_views/virtualmachinecoordinate_add.html'
+
+class VirtualMachineCoordinateBulkImportView(BulkImportView):
+    queryset = VirtualMachineCoordinate.objects.all()
+    model_form = VirtualMachineCoordinatesImportForm
+
+class VirtualMachineCoordinateListView(PermissionRequiredMixin, ObjectListView):
+    permission_required = 'nautobot_topology_views.view_coordinate'
+
+    queryset = VirtualMachineCoordinate.objects.all()
+    table = VirtualMachineCoordinateListTable
+    template_name = 'nautobot_topology_views/virtualmachinecoordinate_list.html'
+    filterset_class = VirtualMachineCoordinateFilterSet
+    filterset_form = VirtualMachineCoordinatesFilterForm
+
+class VirtualMachineCoordinateEditView(PermissionRequiredMixin, ObjectEditView):
+    permission_required = 'nautobot_topology_views.change_coordinate'
+
+    queryset = VirtualMachineCoordinate.objects.all()
+    model_form = VirtualMachineCoordinatesForm
+    template_name = 'nautobot_topology_views/virtualmachinecoordinate_edit.html'
+
+class VirtualMachineCoordinateDeleteView(PermissionRequiredMixin, ObjectDeleteView):
+    permission_required = 'nautobot_topology_views.delete_coordinate'
+
+    queryset = VirtualMachineCoordinate.objects.all()
+
+class VirtualMachineCoordinateChangeLogView(PermissionRequiredMixin, ObjectChangeLogView):
+    permission_required = 'nautobot_topology_views.view_coordinate'
+
+    queryset = VirtualMachineCoordinate.objects.all()
+
 class CoordinateView(PermissionRequiredMixin, ObjectView):
     permission_required = 'nautobot_topology_views.view_coordinate'
 
@@ -1222,8 +1377,11 @@ class CoordinateGroupView(PermissionRequiredMixin, ObjectView):
         RequestConfig(request).configure(powerfeedtable)
         table = CoordinateListTable(instance.coordinate_set.all())
         RequestConfig(request).configure(table)
+        vmtable = VirtualMachineCoordinateListTable(instance.virtualmachinecoordinate_set.all())
+        RequestConfig(request).configure(vmtable)
 
         return {
+            'virtualmachinecoordinates_table': vmtable,
             'circuitcoordinates_table': circuittable,
             'powerpanelcoordinates_table': powerpaneltable,
             'powerfeedcoordinates_table': powerfeedtable,
@@ -1302,6 +1460,7 @@ class TopologyIndividualOptionsView(PermissionRequiredMixin, View):
                 'show_circuit': queryset.show_circuit,
                 'show_power': queryset.show_power,
                 'show_wireless': queryset.show_wireless,
+                'show_virtual_machines': queryset.show_virtual_machines,
                 'group_sites': queryset.group_sites,
                 'group_locations': queryset.group_locations,
                 'group_racks': queryset.group_racks,

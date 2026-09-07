@@ -271,8 +271,10 @@ const coordSaveCheckbox = document.querySelector('#id_save_coords')
                         ]);
                         console.log(e);
                     }
+                    // Nautobot mounts the app's API under its base_url, not its
+                    // Python package name; the old prefix 404'd every save.
                     const res = await fetch(
-                        '/' + basePath + 'api/plugins/nautobot_topology_views/save-coords/save_coords/',
+                        '/' + basePath + 'api/plugins/topology-views/save-coords/save_coords/',
                         {
                             method: 'PATCH',
                             headers: {
@@ -678,7 +680,7 @@ function performXmlDownload() {
 
     
 
-    fetch('/' + basePath + 'api/plugins/nautobot_topology_views/xml-export/?' + xml_search_options).then(response => response.text())
+    fetch('/' + basePath + 'api/plugins/topology-views/xml-export/?' + xml_search_options).then(response => response.text())
     .then(data => {
         var blob = new Blob([data ], { type: "text/plain" });
 
