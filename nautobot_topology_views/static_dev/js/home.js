@@ -251,12 +251,12 @@ const coordSaveCheckbox = document.querySelector('#id_save_coords')
         Promise.allSettled(
             Object.entries(graph.getPositions(params.nodes)).map(
                 async ([nodeId, nodePosition]) => {
-                    if(!isNaN(parseInt(nodeId))) { 
-                        nodeKey = parseInt(nodeId);
-                    }
-                    else {
-                        nodeKey = nodeId;
-                    }
+                    // Node ids are strings: Nautobot primary keys are UUIDs, and the
+                    // c/p/f/v prefixes mark the other node kinds. The NetBox-era
+                    // parseInt turned a UUID starting with a digit into a bare
+                    // number and update() then created a phantom node instead of
+                    // pinning the real one; the server always got the right id.
+                    nodeKey = nodeId;
 
                     try {
                         window.nodes.update({id: nodeKey, physics: false, x: nodePosition.x, y: nodePosition.y});
