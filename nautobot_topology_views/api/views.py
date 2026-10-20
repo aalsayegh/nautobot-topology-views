@@ -51,30 +51,29 @@ class SaveCoordsViewSet(ReadOnlyModelViewSet):
 
         actual_device = None
         model_name = None
-        # Nautobot pks are UUIDs. Device nodes carry the bare UUID; circuit /
-        # power-panel / power-feed nodes are prefixed 'c' / 'p' / 'f'. Test UUID-ness
-        # first so a device UUID that happens to start with c/p/f is not misrouted;
-        # strip exactly one prefix char; use filter().first() so a bad id returns 400
-        # instead of an uncaught DoesNotExist 500.
-        def _is_uuid(value):
+        # Device nodes use bare UUIDs; circuit, power-panel, and power-feed nodes
+        # use c/p/f prefixes. Parse UUIDs before querying so malformed node IDs
+        # return a 400 instead of raising during ORM field conversion.
+        def _get_object(model, value):
             try:
-                uuid.UUID(str(value))
-                return True
-            except (ValueError, TypeError):
-                return False
+                object_id = uuid.UUID(str(value))
+            except (ValueError, TypeError, AttributeError):
+                return None
+            return model.objects.filter(pk=object_id).first()
 
-        if _is_uuid(device_id):
-            actual_device = Device.objects.filter(id=device_id).first()
+        actual_device = _get_object(Device, device_id)
+        if actual_device is not None:
             model_name = 'Coordinate'
-        elif device_id and device_id[0] == "c":
-            actual_device = Circuit.objects.filter(id=device_id[1:]).first()
-            model_name = 'CircuitCoordinate'
-        elif device_id and device_id[0] == "p":
-            actual_device = PowerPanel.objects.filter(id=device_id[1:]).first()
-            model_name = 'PowerPanelCoordinate'
-        elif device_id and device_id[0] == "f":
-            actual_device = PowerFeed.objects.filter(id=device_id[1:]).first()
-            model_name = 'PowerFeedCoordinate'
+        elif isinstance(device_id, str) and device_id:
+            prefixed_models = {
+                "c": (Circuit, "CircuitCoordinate"),
+                "p": (PowerPanel, "PowerPanelCoordinate"),
+                "f": (PowerFeed, "PowerFeedCoordinate"),
+            }
+            model_and_name = prefixed_models.get(device_id[:1])
+            if model_and_name is not None:
+                model, model_name = model_and_name
+                actual_device = _get_object(model, device_id[1:])
 
         if not actual_device:
             return Response({"status": "invalid node_id in body"}, status=400)
@@ -91,15 +90,17 @@ class SaveCoordsViewSet(ReadOnlyModelViewSet):
         try:
             if CoordinateGroup.objects.filter(pk=group_id):
                 group = CoordinateGroup.objects.get(pk=group_id)
-                # Hen-and-egg-problem. Thanks, Django! By default, Django updates records that
-                # already exist and inserts otherwise. This does not work with our
-                # unique_together key if no pk is given. But: No record, no pk.
-                if not model_class.objects.filter(group=group, device=actual_device):
-                    # Unique group/device pair does not exist. Prepare new data set
+                # Update the existing row in place, or create one. Re-instantiating
+                # with an existing pk (the previous approach) breaks on Nautobot's
+                # PrimaryModel: the fresh instance carries created=None, so the
+                # UPDATE writes NULL into a non-null column and every re-save of an
+                # already-pinned node failed with a 500.
+                coords = model_class.objects.filter(group=group, device=actual_device).first()
+                if coords is None:
                     coords = model_class(group=group, device=actual_device, x=x_coord, y=y_coord)
                 else:
-                    # Unique group/device pair already exists. Update data
-                    coords = model_class(pk=model_class.objects.get(group=group, device=actual_device).pk, group=group, device=actual_device, x=x_coord, y=y_coord)
+                    coords.x = x_coord
+                    coords.y = y_coord
                 coords.save()
         except:
             return Response(
