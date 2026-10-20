@@ -64,7 +64,7 @@ class SaveCoordsViewSet(ReadOnlyModelViewSet):
         actual_device = _get_object(Device, device_id)
         if actual_device is not None:
             model_name = 'Coordinate'
-        elif device_id:
+        elif isinstance(device_id, str) and device_id:
             prefixed_models = {
                 "c": (Circuit, "CircuitCoordinate"),
                 "p": (PowerPanel, "PowerPanelCoordinate"),
