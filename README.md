@@ -23,7 +23,7 @@ Options to export to xml (for draw.io/diagrams.net) or png.
 
 ## Requirements
 
-- Nautobot 3.2.X or later
+- Nautobot 3.1.3 or later
 - Python 3.12 or later
 - Django 5.2
 
@@ -76,7 +76,6 @@ systemctl restart nautobot
 | Nautobot version | nautobot-topology-views version |
 | ---------------- | ------------------------------- |
 | = 3.1.X          | = v4.5.1.1                      |
-| = 3.2.X          | = v4.5.1.2                      |
 
 
 ## Configure
