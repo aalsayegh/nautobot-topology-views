@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is **nautobot-topology-views**, a Nautobot App (plugin) that renders network topology maps. It was converted from the `netbox-topology-views` v4.5.1 NetBox plugin to target **Nautobot 3.1.3**, **Python 3.12**, **Django 5.2**, managed with **Poetry**.
+This is **nautobot-topology-views**, a Nautobot App (plugin) that renders network topology maps. It was converted from the `netbox-topology-views` v4.5.1 NetBox plugin to target **Nautobot 3.2.7**, **Python 3.12**, **Django 5.2**, managed with **Poetry**.
 
 The package is `nautobot_topology_views` (Python module) / `nautobot-topology-views` (PyPI/Poetry).
 
@@ -10,7 +10,7 @@ The package is `nautobot_topology_views` (Python module) / `nautobot-topology-vi
 
 ## Tech Stack
 
-- **Runtime**: Python 3.12, Django 5.2, Nautobot 3.1.3
+- **Runtime**: Python 3.12, Django 5.2, Nautobot 3.2.7
 - **Package manager**: Poetry (`pyproject.toml`) — no `setup.py`
 - **Linting/formatting**: `ruff` + `black` (line length 120)
 - **Tests**: `pytest` + `pytest-django`
@@ -24,7 +24,7 @@ The package is `nautobot_topology_views` (Python module) / `nautobot-topology-vi
 - Inherits `NautobotAppConfig` from `nautobot.apps`
 - App name: `"nautobot_topology_views"`, base_url: `"topology-views"`
 
-### Key Verified Import Paths (Nautobot 3.1.3)
+### Key Verified Import Paths (Nautobot 3.2.7)
 
 | What | Import path |
 |------|-------------|
@@ -48,7 +48,7 @@ The package is `nautobot_topology_views` (Python module) / `nautobot-topology-vi
 | `NautobotModelViewSet` (API) | `nautobot.apps.api` |
 | `NautobotModelSerializer` (API) | `nautobot.apps.api` |
 
-### What Does NOT Exist in Nautobot 3.1.3
+### What Does NOT Exist in Nautobot 3.2.7
 
 - `Site`, `SiteGroup`, `Region` → replaced by `Location` hierarchy (`nautobot.dcim.models.Location`)
 - `WirelessLink` → not present

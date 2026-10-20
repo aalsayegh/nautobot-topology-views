@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, Prefetch, Q, QuerySet
 from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponseRedirect, QueryDict
 from django.shortcuts import get_object_or_404, render
@@ -24,6 +24,7 @@ from nautobot.apps.views import (
 from nautobot.circuits.models import Circuit, CircuitTermination, ProviderNetwork
 from nautobot.dcim.models import (
     Cable,
+    CableToCableTermination,
     Device,
     DeviceType,
     FrontPort,
@@ -453,7 +454,7 @@ def get_topology_data(
 
         if show_logical_connections:
             path_complete_interfaces = Interface.objects.filter(
-                Q(_path__destination_id__isnull=False) & Q(device_id__in=device_ids)
+                Q(cable_paths__destination_id__isnull=False) & Q(device_id__in=device_ids)
             )
             for path_complete_interface in path_complete_interfaces:
                 connected_endpoint = path_complete_interface.connected_endpoint
@@ -594,11 +595,11 @@ def get_topology_data(
 
     if show_logical_connections:
         interfaces = Interface.objects.filter(
-            Q(_path__destination_id__isnull=False) & Q(device_id__in=device_ids)
+            Q(cable_paths__destination_id__isnull=False) & Q(device_id__in=device_ids)
         )
 
         for interface in interfaces:
-            destination = interface._path.destination
+            destination = interface.path.destination
             if destination is not None:
                 if isinstance(destination, Interface):
                     if destination.device.id not in device_ids:
@@ -624,8 +625,29 @@ def get_topology_data(
 
     if show_cables:
         cables: QuerySet[Cable] = Cable.objects.filter(
-            Q(_termination_a_device_id__in=device_ids) | Q(_termination_b_device_id__in=device_ids)
-        ).select_related("termination_a_type", "termination_b_type")
+            Q(terminations__interface__device_id__in=device_ids)
+            | Q(terminations__front_port__device_id__in=device_ids)
+            | Q(terminations__rear_port__device_id__in=device_ids)
+            | Q(terminations__console_port__device_id__in=device_ids)
+            | Q(terminations__console_server_port__device_id__in=device_ids)
+            | Q(terminations__power_outlet__device_id__in=device_ids)
+            | Q(terminations__power_port__device_id__in=device_ids)
+        ).distinct().prefetch_related(
+            Prefetch(
+                "terminations",
+                queryset=CableToCableTermination.objects.select_related(
+                    "circuit_termination",
+                    "console_port",
+                    "console_server_port",
+                    "front_port",
+                    "interface",
+                    "power_feed",
+                    "power_outlet",
+                    "power_port",
+                    "rear_port",
+                ),
+            )
+        )
 
         for cable in cables:
             type_a = cable.termination_a_type.model if cable.termination_a_type else None
@@ -646,11 +668,11 @@ def get_topology_data(
             if not hasattr(term_a, "device") or not hasattr(term_b, "device"):
                 continue
 
-            if cable._termination_a_device_id not in nodes_devices:
-                nodes_devices[cable._termination_a_device_id] = term_a.device
+            if term_a.device_id not in nodes_devices:
+                nodes_devices[term_a.device_id] = term_a.device
 
-            if cable._termination_b_device_id not in nodes_devices:
-                nodes_devices[cable._termination_b_device_id] = term_b.device
+            if term_b.device_id not in nodes_devices:
+                nodes_devices[term_b.device_id] = term_b.device
 
             termination_a = {
                 "termination_name": term_a.name,

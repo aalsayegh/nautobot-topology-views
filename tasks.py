@@ -51,7 +51,7 @@ namespace = Collection("nautobot_topology_views")
 namespace.configure(
     {
         "nautobot_topology_views": {
-            "nautobot_ver": "3.1.3",
+            "nautobot_ver": "3.2.7",
             "project_name": "nautobot_topology_views",
             "python_ver": "3.12",
             "local": False,
