@@ -404,6 +404,15 @@ def cable_side_endpoints(cable, side):
     return list(getattr(cable, f"{side}_terminations", []) or [])
 
 
+def termination_link_peers(termination):
+    """Far-end termination objects for a cable termination, across Nautobot versions.
+    Nautobot 3.2 removed the `link_peers` property in favour of `get_cable_peers()`.
+    """
+    if hasattr(termination, "get_cable_peers"):
+        return termination.get_cable_peers()
+    return list(getattr(termination, "link_peers", []) or [])
+
+
 def create_circuit_termination(termination):
     if isinstance(termination, CircuitTermination):
         return {
@@ -468,7 +477,6 @@ def get_topology_data(
     nodes_powerpanel: Dict[int, PowerPanel] = {}
     nodes_powerfeed: Dict[int, PowerFeed] = {}
     nodes_provider_networks = {}
-    cable_ids = DefaultDict(dict)
     interface_ids = DefaultDict(dict)
 
     device_ids = [d.pk for d in queryset]
@@ -487,12 +495,10 @@ def get_topology_data(
 
         ports = chain(interfaces, frontports, rearports)
         for port in ports:
-            # Nautobot has no NetBox-style `link_peers` list; a termination has at
-            # most one cable peer, exposed via get_cable_peer().
-            link_peer = port.get_cable_peer()
-            link_peer_device = get_termination_device(link_peer) if link_peer is not None else None
-            if link_peer_device is not None and link_peer_device.id not in device_ids:
-                device_ids.append(link_peer_device.id)
+            for link_peer in termination_link_peers(port):
+                link_peer_device = get_termination_device(link_peer)
+                if link_peer_device is not None and link_peer_device.id not in device_ids:
+                    device_ids.append(link_peer_device.id)
 
         if show_logical_connections:
             # Module-hosted interfaces: Nautobot 3.x Module has no queryable
@@ -505,7 +511,9 @@ def get_topology_data(
             )
             for path_complete_interface in path_complete_interfaces:
                 connected_endpoint = path_complete_interface.connected_endpoint
-                if connected_endpoint is not None and not isinstance(connected_endpoint, ProviderNetwork):
+                # A path can end on a ProviderNetwork or CircuitTermination; get_termination_device
+                # returns None for those, so only device-borne endpoints widen the node set.
+                if connected_endpoint is not None:
                     endpoint_device = get_termination_device(connected_endpoint)
                     if endpoint_device is not None:
                         device_ids.append(endpoint_device.id)
@@ -607,10 +615,10 @@ def get_topology_data(
                 power_link_name = ""
                 if power_feed.pk not in nodes_powerfeed:
                     if not show_unconnected:
-                        power_peer = power_feed.get_cable_peer()
-                        if power_peer is not None and power_peer.device_id in device_ids:
+                        power_feed_peers = termination_link_peers(power_feed)
+                        if power_feed_peers and getattr(power_feed_peers[0], "device_id", None) in device_ids:
                             nodes_powerfeed[power_feed.pk] = power_feed
-                            power_link_name = power_peer.name
+                            power_link_name = power_feed_peers[0].name
                     else:
                         nodes_powerfeed[power_feed.pk] = power_feed
 
