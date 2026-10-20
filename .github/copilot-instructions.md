@@ -10,7 +10,7 @@ The package is `nautobot_topology_views` (Python module) / `nautobot-topology-vi
 
 ## Tech Stack
 
-- **Runtime**: Python 3.12, Django 5.2, Nautobot 3.1.3
+- **Runtime**: Python 3.12, Django 5.2, Nautobot 3.2.7
 - **Package manager**: Poetry (`pyproject.toml`) — no `setup.py`
 - **Linting/formatting**: `ruff` + `black` (line length 120)
 - **Tests**: `pytest` + `pytest-django`
