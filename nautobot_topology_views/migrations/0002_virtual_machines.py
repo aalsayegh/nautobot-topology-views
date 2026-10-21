@@ -38,8 +38,8 @@ class Migration(migrations.Migration):
                     "_custom_field_data",
                     models.JSONField(blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder),
                 ),
-                ("x", models.IntegerField()),
-                ("y", models.IntegerField()),
+                ("x", models.IntegerField(help_text='X-coordinate of the virtual machine (horizontal) on the canvas. ' 'Smaller values correspond to a position further to the left on the monitor.')),
+                ("y", models.IntegerField(help_text='Y-coordinate of the virtual machine (vertical) on the canvas. ' 'Smaller values correspond to a position further up on the monitor.')),
                 (
                     "device",
                     models.ForeignKey(

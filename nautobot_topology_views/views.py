@@ -1,3 +1,4 @@
+from django.utils.html import escape
 import json
 import uuid
 from functools import reduce
@@ -94,6 +95,7 @@ from nautobot_topology_views.tables import (
 )
 from nautobot_topology_views.utils import (
     CONF_IMAGE_DIR,
+    IMAGE_DIR,
     IMAGE_FILETYPES,
     LinePattern,
     abbreviate_interface_name,
@@ -135,7 +137,11 @@ def get_image_for_virtual_machine(vm: VirtualMachine):
     """
     if vm.role is not None and find_image_in_dir(vm.role.name, CONF_IMAGE_DIR):
         return find_image_url(vm.role.name)
-    return find_image_url("virtual-machine")
+    # A custom image directory may carry its own VM icon; if it does not, use the
+    # bundled one explicitly (find_image_url would fall back to role-unknown).
+    if custom := find_image_in_dir("virtual-machine", CONF_IMAGE_DIR):
+        return image_static_url(custom)
+    return find_image_url("virtual-machine", IMAGE_DIR)
 
 
 def get_image_for_entity(entity: Union[Device, VirtualMachine, Circuit, PowerPanel, PowerFeed]):
@@ -213,12 +219,12 @@ def create_node(
         cluster = device.cluster
 
         node_content += (
-            f"<tr><th>Virtual machine on: </th><td>{cluster.name} ({cluster.cluster_type.name})</td></tr>"
+            f"<tr><th>Virtual machine on: </th><td>{escape(cluster.name)} ({escape(cluster.cluster_type.name)})</td></tr>"
         )
         if device.role is not None:
-            node_content += f"<tr><th>Role: </th><td>{device.role.name}</td></tr>"
+            node_content += f"<tr><th>Role: </th><td>{escape(device.role.name)}</td></tr>"
         if device.status is not None:
-            node_content += f"<tr><th>Status: </th><td>{device.status.name}</td></tr>"
+            node_content += f"<tr><th>Status: </th><td>{escape(device.status.name)}</td></tr>"
         if device.vcpus is not None:
             node_content += f"<tr><th>vCPUs: </th><td>{device.vcpus}</td></tr>"
         if device.memory is not None:
@@ -226,9 +232,9 @@ def create_node(
         if device.disk is not None:
             node_content += f"<tr><th>Disk: </th><td>{device.disk} GB</td></tr>"
         if device.primary_ip is not None:
-            node_content += f"<tr><th>IP Address: </th><td>{device.primary_ip.address}</td></tr>"
+            node_content += f"<tr><th>IP Address: </th><td>{escape(str(device.primary_ip.address))}</td></tr>"
         if cluster.location is not None:
-            node_content += f"<tr><th>Location: </th><td>{cluster.location.name}</td></tr>"
+            node_content += f"<tr><th>Location: </th><td>{escape(cluster.location.name)}</td></tr>"
             # Group rectangles are drawn from these; a VM sits where its cluster sits.
             node["location"] = cluster.location.name
             node["location_id"] = cluster.location_id
@@ -399,7 +405,7 @@ def create_edge(
 
     if circuit is not None:
         edge["dashes"] = True
-        title = f"Circuit provider: {circuit['provider_name']}<br>Termination"
+        title = f"Circuit provider: {escape(circuit['provider_name'])}<br>Termination"
 
     elif wireless is not None:
         edge["dashes"] = LinePattern().wireless
@@ -414,7 +420,7 @@ def create_edge(
         # nobody reads copper into it.
         edge["dashes"] = LinePattern().virtual
         edge["color"] = '#8e44ad'
-        title = f"Virtual machine on cluster {virtual['cluster_name']} ({virtual['cluster_type']})"
+        title = f"Virtual machine on cluster {escape(virtual['cluster_name'])} ({escape(virtual['cluster_type'])})"
 
     elif interface is not None:
         title = "Interface Connection"
@@ -424,7 +430,7 @@ def create_edge(
         edge["href"] = interface.get_absolute_url() + "trace"
 
     if cable is not None and hasattr(cable, "label") and cable.label:
-        cable_label = "<br>Label: " + cable.label
+        cable_label = "<br>Label: " + escape(cable.label)
         if draw_cable_labels is True:
             edge["label"] = cable.label
     else:
@@ -432,7 +438,10 @@ def create_edge(
 
     edge[
         "title"
-    ] = f"{title} between<br>{cable_a_dev_name} [{cable_a_name}]<br>{cable_b_dev_name} [{cable_b_name}] {cable_label}"
+    ] = (
+        f"{title} between<br>{escape(cable_a_dev_name)} [{escape(cable_a_name)}]"
+        f"<br>{escape(cable_b_dev_name)} [{escape(cable_b_name)}] {cable_label}"
+    )
 
     if cable is not None:
         edge["href"] = cable.get_absolute_url()
@@ -880,12 +889,18 @@ def get_topology_data(
             .distinct()
             .prefetch_related("clusters__cluster_type")
         )
+        # Seeing a host does not grant seeing every VM in its cluster: only VMs the
+        # viewer may view are drawn. Each cluster's list is fetched once per request,
+        # however many of its hosts are on the map.
+        viewable_vms = VirtualMachine.objects.restrict(individualOptions.user, "view").select_related(
+            "cluster__cluster_type", "cluster__location", "role", "status", "primary_ip4", "primary_ip6"
+        )
+        vms_by_cluster: Dict[uuid.UUID, list] = {}
         for host in hosts:
             for cluster in host.clusters.all():
-                vms = VirtualMachine.objects.filter(cluster=cluster).select_related(
-                    "cluster__cluster_type", "cluster__location", "role", "status", "primary_ip4", "primary_ip6"
-                )
-                for vm in vms:
+                if cluster.pk not in vms_by_cluster:
+                    vms_by_cluster[cluster.pk] = list(viewable_vms.filter(cluster=cluster))
+                for vm in vms_by_cluster[cluster.pk]:
                     if host.pk not in nodes_devices:
                         nodes_devices[host.pk] = host
                     nodes_vms[vm.pk] = vm
